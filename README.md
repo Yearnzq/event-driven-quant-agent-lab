@@ -1,0 +1,93 @@
+# Event-Driven Quant Agent Lab
+
+Research workspace for comparing event-driven trading engines and designing a
+human-in-the-loop multi-agent quant advisory system.
+
+## Upstream References
+
+The source snapshots live under `upstreams/`.
+
+| Project | Local path | Primary idea to study |
+| --- | --- | --- |
+| NautilusTrader | `upstreams/nautilus_trader` | Production-grade deterministic event engine, backtest/live parity, multi-asset abstractions |
+| aat | `upstreams/aat` | Async strategy callbacks, trading/risk/execution/backtest engine split |
+| QUANTAXIS | `upstreams/QUANTAXIS` | Chinese quant workflow, pub/sub engine, A-share/futures-oriented lifecycle |
+| alphahunter | `upstreams/alphahunter` | asyncio event loop, market-making style strategy objects |
+| aioquant | `upstreams/aioquant` | Lightweight async market data, order, timer, and task modules |
+
+`upstreams-manifest.json` records the branch/source used for each downloaded
+snapshot. Git was not available in the current shell, so these are GitHub
+zipball snapshots rather than full git clones.
+
+## Working Thesis
+
+Use one primary event-driven engine as the runtime base, then borrow ideas from
+the other systems where they improve the design. Do not merge five frameworks
+into one runtime.
+
+The intended product is not an autonomous trading bot. It is a daily advisory
+system:
+
+1. Collect market, position, news, macro, and historical context.
+2. Convert raw inputs into normalized events and features.
+3. Ask specialized model agents for analysis.
+4. Aggregate those model outputs into a structured recommendation.
+5. Run hard risk checks.
+6. Produce a daily report for human approval.
+
+## First Architecture Direction
+
+- **Primary runtime candidate:** NautilusTrader if production-grade execution,
+  multi-asset support, and backtest/live consistency matter most.
+- **Fast prototype candidate:** aat if the team wants to stay mostly in Python
+  while validating strategy and agent workflows.
+- **Ideas to borrow:**
+  - NautilusTrader: deterministic event model and strict domain objects.
+  - aat: risk/execution/backtest separation.
+  - QUANTAXIS: localized market workflow and distributed/pub-sub thinking.
+  - alphahunter/aioquant: lightweight async I/O and strategy callback style.
+
+See `docs/architecture.md` for the initial system design.
+
+## Planning
+
+- Chinese implementation roadmap: `docs/roadmap.zh.md`
+- Additional open-source project research: `docs/additional-research.zh.md`
+- Optimized implementation path: `docs/implementation-path.zh.md`
+- Advisory core engineering constraints: `docs/advisory-core-spec.zh.md`
+- Phase 1 implementation status: `docs/phase1-status.zh.md`
+
+## Phase 1 Skeleton
+
+Run tests in the `medifuse` container:
+
+```bash
+cd /workspace/event-driven-quant-agent-lab
+source /opt/miniconda3/etc/profile.d/conda.sh
+conda activate medi
+python -m pytest -q
+```
+
+Run the deterministic mock advisory pipeline:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli --symbol BTC-USDT --output-dir artifacts/reports
+```
+
+Run with CSV data:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --data-source csv \
+  --symbol BTC-USDT \
+  --bars-1h-csv path/to/bars_1h.csv \
+  --bars-1d-csv path/to/bars_1d.csv \
+  --portfolio-json path/to/portfolio.json \
+  --output-dir artifacts/reports
+```
+
+Expected CSV columns:
+
+```text
+symbol,ts,open,high,low,close,volume,source
+```

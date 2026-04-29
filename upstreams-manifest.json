@@ -1,0 +1,68 @@
+﻿[
+    {
+        "branch":  "develop",
+        "source":  "zipball",
+        "name":  "openbb",
+        "repo":  "https://github.com/OpenBB-finance/OpenBB"
+    },
+    {
+        "branch":  "develop",
+        "source":  "zipball",
+        "name":  "nautilus_trader",
+        "repo":  "https://github.com/nautechsystems/nautilus_trader"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "QUANTAXIS",
+        "repo":  "https://github.com/QUANTAXIS/QUANTAXIS"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "vectorbt",
+        "repo":  "https://github.com/polakowo/vectorbt"
+    },
+    {
+        "branch":  "main",
+        "source":  "zipball",
+        "name":  "skfolio",
+        "repo":  "https://github.com/skfolio/skfolio"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "lean",
+        "repo":  "https://github.com/QuantConnect/Lean"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "aioquant",
+        "repo":  "https://github.com/paulran/aioquant"
+    },
+    {
+        "branch":  "main",
+        "source":  "zipball",
+        "name":  "aat",
+        "repo":  "https://github.com/AsyncAlgoTrading/aat"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "alphahunter",
+        "repo":  "https://github.com/phonegapX/alphahunter"
+    },
+    {
+        "branch":  "master",
+        "source":  "zipball",
+        "name":  "hummingbot",
+        "repo":  "https://github.com/hummingbot/hummingbot"
+    },
+    {
+        "branch":  "develop",
+        "source":  "zipball",
+        "name":  "freqtrade",
+        "repo":  "https://github.com/freqtrade/freqtrade"
+    }
+]
