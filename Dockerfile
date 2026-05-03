@@ -93,6 +93,6 @@ CMD ["/start.sh"]
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD conda run -n quant python -c "import quant_agent_lab" || exit 1
 
-LABEL maintainer="yaozq@proton.me" \
+LABEL maintainer="yearn@local.gpu" \
       version="1.0" \
       description="Event-Driven Quant Agent Lab dev environment - Ubuntu 22.04 + CUDA 12.5.1 + Miniconda Python 3.10 + SSH + Git"
