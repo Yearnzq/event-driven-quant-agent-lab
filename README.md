@@ -117,9 +117,6 @@ Then run the CSV pipeline using the generated `metadata.json` `as_of` value:
 PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --data-source csv \
   --symbol BTC-USDT \
-  --as-of 2026-04-29T00:00:00Z \
-  --bars-1h-csv sample_data/binance_btc_usdt/bars_1h.csv \
-  --bars-1d-csv sample_data/binance_btc_usdt/bars_1d.csv \
-  --portfolio-json sample_data/binance_btc_usdt/portfolio.json \
+  --csv-dir sample_data/binance_btc_usdt \
   --output-dir artifacts/reports
 ```

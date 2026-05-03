@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from quant_agent_lab.core.config import CsvDataConfig, PipelineConfig
 from quant_agent_lab.app.pipeline import run_daily_pipeline
+from quant_agent_lab.app.cli import main
 
 
 def _write_bars(path, *, symbol: str, timeframe: str, count: int, as_of: datetime) -> None:
@@ -56,3 +57,46 @@ def test_pipeline_loads_csv_data(tmp_path) -> None:
     assert result.data_validation.status.value == "pass"
     assert (tmp_path / "out" / f"{result.run_id}.audit.json").exists()
     assert (tmp_path / "out" / "audit-log.jsonl").exists()
+
+
+def test_cli_loads_csv_dir_metadata(tmp_path) -> None:
+    as_of = datetime(2026, 4, 29, tzinfo=timezone.utc)
+    csv_dir = tmp_path / "csv"
+    csv_dir.mkdir()
+    _write_bars(csv_dir / "bars_1h.csv", symbol="BTC-USDT", timeframe="1h", count=72, as_of=as_of)
+    _write_bars(csv_dir / "bars_1d.csv", symbol="BTC-USDT", timeframe="1d", count=45, as_of=as_of)
+    (csv_dir / "portfolio.json").write_text(
+        json.dumps(
+            {
+                "as_of": as_of.isoformat(),
+                "equity": 100000,
+                "cash": 90000,
+                "positions": {"BTC-USDT": 0.1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (csv_dir / "metadata.json").write_text(
+        json.dumps(
+            {
+                "as_of": as_of.isoformat(),
+                "bars_1h_csv": "bars_1h.csv",
+                "bars_1d_csv": "bars_1d.csv",
+                "portfolio_json": "portfolio.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "--data-source",
+            "csv",
+            "--csv-dir",
+            str(csv_dir),
+            "--output-dir",
+            str(tmp_path / "reports"),
+        ]
+    )
+
+    assert exit_code == 0

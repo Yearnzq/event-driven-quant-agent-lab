@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,6 +18,18 @@ def _parse_as_of(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _load_csv_dir(csv_dir: Path) -> tuple[CsvDataConfig, datetime | None]:
+    metadata_path = csv_dir / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
+    config = CsvDataConfig(
+        bars_1h_csv=csv_dir / str(metadata.get("bars_1h_csv", "bars_1h.csv")),
+        bars_1d_csv=csv_dir / str(metadata.get("bars_1d_csv", "bars_1d.csv")),
+        portfolio_json=csv_dir / str(metadata.get("portfolio_json", "portfolio.json")),
+    )
+    as_of = _parse_as_of(str(metadata["as_of"])) if metadata.get("as_of") else None
+    return config, as_of
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run Phase 1 daily advisory pipeline.")
     parser.add_argument("--write-sample-data", help="Write a deterministic CSV sample dataset and exit.")
@@ -25,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--as-of", help="UTC as-of timestamp for CSV runs, e.g. 2026-04-29T00:00:00Z.")
     parser.add_argument("--output-dir", default="artifacts/reports")
     parser.add_argument("--data-source", choices=["mock", "csv"], default="mock")
+    parser.add_argument("--csv-dir", help="Directory containing bars_1h.csv, bars_1d.csv, portfolio.json, and optional metadata.json.")
     parser.add_argument("--bars-1h-csv")
     parser.add_argument("--bars-1d-csv")
     parser.add_argument("--portfolio-json")
@@ -61,26 +75,30 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     csv_config = None
+    metadata_as_of = None
+    if args.csv_dir:
+        csv_config, metadata_as_of = _load_csv_dir(Path(args.csv_dir))
     if args.data_source == "csv":
-        missing = [
-            name
-            for name, value in {
-                "--bars-1h-csv": args.bars_1h_csv,
-                "--bars-1d-csv": args.bars_1d_csv,
-                "--portfolio-json": args.portfolio_json,
-            }.items()
-            if not value
-        ]
-        if missing:
-            parser.error(f"csv data source requires: {', '.join(missing)}")
-        csv_config = CsvDataConfig(
-            bars_1h_csv=Path(args.bars_1h_csv),
-            bars_1d_csv=Path(args.bars_1d_csv),
-            portfolio_json=Path(args.portfolio_json),
-        )
+        if csv_config is None:
+            missing = [
+                name
+                for name, value in {
+                    "--bars-1h-csv": args.bars_1h_csv,
+                    "--bars-1d-csv": args.bars_1d_csv,
+                    "--portfolio-json": args.portfolio_json,
+                }.items()
+                if not value
+            ]
+            if missing:
+                parser.error(f"csv data source requires --csv-dir or: {', '.join(missing)}")
+            csv_config = CsvDataConfig(
+                bars_1h_csv=Path(args.bars_1h_csv),
+                bars_1d_csv=Path(args.bars_1d_csv),
+                portfolio_json=Path(args.portfolio_json),
+            )
     config = PipelineConfig(
         symbol=args.symbol,
-        as_of=_parse_as_of(args.as_of) if args.as_of else PipelineConfig().as_of,
+        as_of=_parse_as_of(args.as_of) if args.as_of else metadata_as_of or PipelineConfig().as_of,
         data_source=args.data_source,
         csv=csv_config,
         output_dir=Path(args.output_dir),
