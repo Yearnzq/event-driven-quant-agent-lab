@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 from quant_agent_lab.core.events import evidence_id
 from quant_agent_lab.core.schemas import Bar, PortfolioSnapshot
 from quant_agent_lab.data.importers import write_bars_csv
+from quant_agent_lab.data.metadata import build_dataset_manifest
 
 
 BINANCE_MARKET_DATA_BASE_URL = "https://data-api.binance.vision"
@@ -115,20 +116,13 @@ def write_binance_csv_dataset(
         json.dumps(portfolio.model_dump(mode="json"), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    manifest = build_dataset_manifest(output_dir, symbol=symbol, as_of=as_of, source="binance")
+    metadata = manifest.model_dump(mode="json")
+    metadata["exchange"] = "binance"
+    metadata["exchange_symbol"] = _project_symbol_to_binance(symbol)
+    metadata["as_of"] = as_of.isoformat()
     (output_dir / "metadata.json").write_text(
-        json.dumps(
-            {
-                "exchange": "binance",
-                "symbol": symbol,
-                "exchange_symbol": _project_symbol_to_binance(symbol),
-                "as_of": as_of.isoformat(),
-                "bars_1h_csv": "bars_1h.csv",
-                "bars_1d_csv": "bars_1d.csv",
-                "portfolio_json": "portfolio.json",
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
+        json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True),
         encoding="utf-8",
     )
     return output_dir

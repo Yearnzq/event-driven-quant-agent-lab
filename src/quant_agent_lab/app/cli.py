@@ -8,7 +8,11 @@ from pathlib import Path
 from quant_agent_lab.app.pipeline import run_daily_pipeline
 from quant_agent_lab.core.config import CsvDataConfig, PipelineConfig, RiskConfig
 from quant_agent_lab.data.connectors import write_binance_csv_dataset
-from quant_agent_lab.data.importers import write_sample_csv_dataset
+from quant_agent_lab.data.csv_loader import load_bars_csv
+from quant_agent_lab.data.importers import write_bad_csv_dataset, write_sample_csv_dataset
+from quant_agent_lab.data.metadata import validate_dataset_manifest
+from quant_agent_lab.data.text_cleaning import clean_news_jsonl
+from quant_agent_lab.research.evaluation import evaluate_ma_crossover, render_signal_evaluation_markdown
 
 
 def _parse_as_of(value: str) -> datetime:
@@ -33,7 +37,12 @@ def _load_csv_dir(csv_dir: Path) -> tuple[CsvDataConfig, datetime | None]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run Phase 1 daily advisory pipeline.")
     parser.add_argument("--write-sample-data", help="Write a deterministic CSV sample dataset and exit.")
+    parser.add_argument("--write-bad-sample-data", help="Write deterministic bad CSV samples for Data Gate tests and exit.")
+    parser.add_argument("--validate-dataset", help="Validate a CSV dataset metadata manifest and exit.")
     parser.add_argument("--download-binance-data", help="Download public Binance OHLCV CSV data and exit.")
+    parser.add_argument("--evaluate-signals", action="store_true", help="Evaluate deterministic signals on CSV daily bars and exit.")
+    parser.add_argument("--clean-news-jsonl", help="Clean raw news/web JSONL into schema-safe text evidence and exit.")
+    parser.add_argument("--cleaned-news-output", help="Output path for --clean-news-jsonl.")
     parser.add_argument("--symbol", default="BTC-USDT")
     parser.add_argument("--as-of", help="UTC as-of timestamp for CSV runs, e.g. 2026-04-29T00:00:00Z.")
     parser.add_argument("--output-dir", default="artifacts/reports")
@@ -44,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--portfolio-json")
     parser.add_argument("--hourly-limit", type=int, default=72)
     parser.add_argument("--daily-limit", type=int, default=45)
+    parser.add_argument("--fast-window", type=int, default=7)
+    parser.add_argument("--slow-window", type=int, default=30)
+    parser.add_argument("--horizon", type=int, default=1)
     parser.add_argument("--portfolio-equity", type=float, default=100000.0)
     parser.add_argument("--portfolio-cash", type=float, default=100000.0)
     parser.add_argument("--position-pct", type=float, default=0.0)
@@ -59,6 +71,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote sample dataset to {output_dir}")
         return 0
 
+    if args.write_bad_sample_data:
+        output_dir = write_bad_csv_dataset(Path(args.write_bad_sample_data), symbol=args.symbol)
+        print(f"Wrote bad sample dataset to {output_dir}")
+        return 0
+
+    if args.validate_dataset:
+        result = validate_dataset_manifest(Path(args.validate_dataset))
+        print(result.model_dump_json(indent=2))
+        return 0 if result.status == "pass" else 1
+
     if args.download_binance_data:
         output_dir = write_binance_csv_dataset(
             Path(args.download_binance_data),
@@ -72,6 +94,13 @@ def main(argv: list[str] | None = None) -> int:
         metadata = output_dir / "metadata.json"
         print(f"Wrote Binance public market dataset to {output_dir}")
         print(f"Metadata: {metadata}")
+        return 0
+
+    if args.clean_news_jsonl:
+        if not args.cleaned_news_output:
+            parser.error("--clean-news-jsonl requires --cleaned-news-output")
+        output_path = clean_news_jsonl(Path(args.clean_news_jsonl), Path(args.cleaned_news_output))
+        print(f"Wrote cleaned text evidence to {output_path}")
         return 0
 
     csv_config = None
@@ -96,6 +125,35 @@ def main(argv: list[str] | None = None) -> int:
                 bars_1d_csv=Path(args.bars_1d_csv),
                 portfolio_json=Path(args.portfolio_json),
             )
+
+    if args.evaluate_signals:
+        bars_1d_csv = csv_config.bars_1d_csv if csv_config is not None else None
+        if bars_1d_csv is None and args.bars_1d_csv:
+            bars_1d_csv = Path(args.bars_1d_csv)
+        if bars_1d_csv is None:
+            parser.error("--evaluate-signals requires --csv-dir or --bars-1d-csv")
+        bars_1d = load_bars_csv(bars_1d_csv, symbol=args.symbol, timeframe="1d")
+        try:
+            summary = evaluate_ma_crossover(
+                bars_1d,
+                fast_window=args.fast_window,
+                slow_window=args.slow_window,
+                horizon=args.horizon,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        report = render_signal_evaluation_markdown(summary)
+        output_dir = Path(args.output_dir)
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / f"{summary.strategy_name}.md").write_text(report, encoding="utf-8")
+            (output_dir / f"{summary.strategy_name}.json").write_text(
+                json.dumps(summary.model_dump(mode="json"), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        print(report)
+        return 0
+
     config = PipelineConfig(
         symbol=args.symbol,
         as_of=_parse_as_of(args.as_of) if args.as_of else metadata_as_of or PipelineConfig().as_of,
