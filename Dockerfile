@@ -48,7 +48,7 @@ RUN apt-get update && \
 # SSH service configuration. Bind the container port to localhost when running.
 RUN mkdir -p /var/run/sshd /root/.ssh && \
     chmod 700 /root/.ssh && \
-    echo 'root:42317037' | chpasswd && \
+    echo 'root:yourpwd' | chpasswd && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 EXPOSE 22
