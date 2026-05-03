@@ -46,7 +46,10 @@ def run_daily_pipeline(
     risk_decision = RiskGate(
         max_position_pct=config.risk.max_position_pct,
         max_loss_budget_pct=config.risk.max_loss_budget_pct,
-    ).evaluate(recommendation)
+        max_existing_position_pct=config.risk.max_existing_position_pct,
+        min_cash_pct=config.risk.min_cash_pct,
+        max_hourly_return_vol=config.risk.max_hourly_return_vol,
+    ).evaluate(recommendation, market=market, signals=signals)
     report = render_daily_report(
         run_id=current_run_id,
         signals=signals,

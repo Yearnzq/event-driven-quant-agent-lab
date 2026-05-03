@@ -41,3 +41,33 @@ def test_data_failure_forces_insufficient_evidence() -> None:
     assert draft.action == Action.INSUFFICIENT_EVIDENCE
     assert risk.final_action == Action.INSUFFICIENT_EVIDENCE
     assert risk.order_allowed is False
+
+
+def test_risk_gate_blocks_large_existing_position() -> None:
+    snapshot = load_mock_market_snapshot()
+    validation = validate_market_snapshot(snapshot)
+    signals = build_signal_bundle(snapshot)
+    draft = build_recommendation_draft(signals, validation, [])
+
+    risk = RiskGate(max_existing_position_pct=0.05).evaluate(
+        draft,
+        market=snapshot,
+        signals=signals,
+    )
+
+    assert risk.status == GateStatus.FAIL
+    assert "existing position exceeds limit" in risk.reasons
+
+
+def test_risk_gate_blocks_low_cash_buffer() -> None:
+    snapshot = load_mock_market_snapshot()
+    low_cash_portfolio = snapshot.portfolio.model_copy(update={"cash": 1000})
+    snapshot = snapshot.model_copy(update={"portfolio": low_cash_portfolio})
+    validation = validate_market_snapshot(snapshot)
+    signals = build_signal_bundle(snapshot)
+    draft = build_recommendation_draft(signals, validation, [])
+
+    risk = RiskGate(min_cash_pct=0.05).evaluate(draft, market=snapshot, signals=signals)
+
+    assert risk.status == GateStatus.FAIL
+    assert "cash buffer is below minimum" in risk.reasons

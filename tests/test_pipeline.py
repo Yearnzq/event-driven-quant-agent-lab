@@ -19,6 +19,8 @@ def test_daily_pipeline_generates_report_and_audit_fields() -> None:
     assert result.risk_decision.order_allowed is False
     assert result.recommendation.evidence_ids
     assert "Daily Advisory Report" in result.report_markdown
+    assert "Advisory Interpretation" in result.report_markdown
+    assert "not an automated trading instruction" in result.report_markdown
 
 
 def test_strict_risk_config_blocks_directional_draft() -> None:

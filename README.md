@@ -91,3 +91,35 @@ Expected CSV columns:
 ```text
 symbol,ts,open,high,low,close,volume,source
 ```
+
+Generate a deterministic sample CSV dataset:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --write-sample-data sample_data/btc_usdt
+```
+
+The Phase 1.1 risk gate also checks existing position size, cash buffer, and
+hourly return volatility. These checks are advisory-only: `order_allowed`
+remains `false` in Phase 1.
+
+Download public Binance OHLCV data without API keys:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --download-binance-data sample_data/binance_btc_usdt \
+  --symbol BTC-USDT
+```
+
+Then run the CSV pipeline using the generated `metadata.json` `as_of` value:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --data-source csv \
+  --symbol BTC-USDT \
+  --as-of 2026-04-29T00:00:00Z \
+  --bars-1h-csv sample_data/binance_btc_usdt/bars_1h.csv \
+  --bars-1d-csv sample_data/binance_btc_usdt/bars_1d.csv \
+  --portfolio-json sample_data/binance_btc_usdt/portfolio.json \
+  --output-dir artifacts/reports
+```

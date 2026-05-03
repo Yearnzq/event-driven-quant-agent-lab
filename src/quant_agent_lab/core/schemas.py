@@ -70,6 +70,52 @@ class PortfolioSnapshot(BaseModel):
     evidence_id: str
 
 
+class NewsEvent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    published_at: datetime
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    entities: list[str] = Field(default_factory=list)
+    market_relevance: float = Field(ge=0, le=1)
+    url: str | None = None
+    content_hash: str
+    evidence_id: str
+
+    @field_validator("published_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("published_at must be timezone-aware")
+        return value.astimezone(timezone.utc)
+
+
+class CleanedTextEvidence(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    evidence_id: str
+    source: str
+    published_at: datetime
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    entities: list[str] = Field(default_factory=list)
+    market_relevance: float = Field(ge=0, le=1)
+    url: str | None = None
+    content_hash: str
+
+    @classmethod
+    def from_news_event(cls, event: NewsEvent) -> "CleanedTextEvidence":
+        return cls(**event.model_dump())
+
+    @field_validator("published_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("published_at must be timezone-aware")
+        return value.astimezone(timezone.utc)
+
+
 class MarketSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 

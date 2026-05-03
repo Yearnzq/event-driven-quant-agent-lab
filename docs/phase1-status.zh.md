@@ -104,3 +104,21 @@ artifacts/reports/audit-log.jsonl
 3. 增加 `NewsEvent` / `CleanedTextEvidence` schema，但不接网页原文。
 4. 增加更严格的 risk rules：最大回撤、波动率目标、已有仓位约束。
 5. 增加 report template，把“为什么 review_required”写得更清晰。
+
+## 2026-05-03 Phase 1.1 更新
+
+已补充：
+
+- CSV 归一化工具：`quant_agent_lab.data.importers.normalize_ohlcv_csv`，可把常见交易所导出的 OHLCV 字段名归一为项目标准 schema。
+- 样例数据生成：CLI 增加 `--write-sample-data`，生成 `bars_1h.csv`、`bars_1d.csv`、`portfolio.json`。
+- 外部文本输入 schema：新增 `NewsEvent` 和 `CleanedTextEvidence`，只保存清洗后的摘要、实体、发布时间、相关度和内容哈希，不保存网页/新闻全文。
+- Risk Gate 增强：新增当前仓位上限、现金缓冲、小时收益波动率检查。
+- Daily report 增强：新增 rationale、risk flags、advisory interpretation 和“非自动交易指令”说明。
+- 真实只读行情入口：新增 Binance 公共 Kline 下载器，不需要 API key，只写入 CSV/JSON，本阶段不触碰交易或账户接口。
+
+仍然保持 Phase 1 约束：
+
+- 不接真实交易所。
+- 不接真实模型 API。
+- 不自动下单。
+- `order_allowed` 恒为 `false`。
