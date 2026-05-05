@@ -12,7 +12,12 @@ from quant_agent_lab.data.csv_loader import load_bars_csv
 from quant_agent_lab.data.importers import write_bad_csv_dataset, write_sample_csv_dataset
 from quant_agent_lab.data.metadata import validate_dataset_manifest
 from quant_agent_lab.data.text_cleaning import clean_news_jsonl
-from quant_agent_lab.research.evaluation import evaluate_ma_crossover, render_signal_evaluation_markdown
+from quant_agent_lab.research.evaluation import (
+    build_signal_research_report,
+    default_signal_registry,
+    render_signal_research_markdown,
+    write_signal_research_artifacts,
+)
 
 
 def _parse_as_of(value: str) -> datetime:
@@ -55,6 +60,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--daily-limit", type=int, default=45)
     parser.add_argument("--fast-window", type=int, default=7)
     parser.add_argument("--slow-window", type=int, default=30)
+    parser.add_argument("--breakout-window", type=int, default=20)
+    parser.add_argument("--volatility-window", type=int, default=20)
+    parser.add_argument("--volatility-threshold", type=float, default=0.03)
     parser.add_argument("--horizon", type=int, default=1)
     parser.add_argument("--portfolio-equity", type=float, default=100000.0)
     parser.add_argument("--portfolio-cash", type=float, default=100000.0)
@@ -64,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-existing-position-pct", type=float, default=0.25)
     parser.add_argument("--min-cash-pct", type=float, default=0.05)
     parser.add_argument("--max-hourly-return-vol", type=float, default=0.03)
+    parser.add_argument("--max-recent-drawdown-pct", type=float, default=0.12)
+    parser.add_argument("--max-downside-volatility", type=float, default=0.025)
+    parser.add_argument("--max-single-hour-loss-pct", type=float, default=0.08)
+    parser.add_argument("--max-portfolio-risk-budget-pct", type=float, default=0.01)
     args = parser.parse_args(argv)
 
     if args.write_sample_data:
@@ -134,24 +146,20 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--evaluate-signals requires --csv-dir or --bars-1d-csv")
         bars_1d = load_bars_csv(bars_1d_csv, symbol=args.symbol, timeframe="1d")
         try:
-            summary = evaluate_ma_crossover(
-                bars_1d,
+            registry = default_signal_registry(
                 fast_window=args.fast_window,
                 slow_window=args.slow_window,
-                horizon=args.horizon,
+                breakout_window=args.breakout_window,
+                volatility_window=args.volatility_window,
+                volatility_threshold=args.volatility_threshold,
             )
+            report = build_signal_research_report(bars_1d, registry=registry, horizon=args.horizon)
         except ValueError as exc:
             parser.error(str(exc))
-        report = render_signal_evaluation_markdown(summary)
         output_dir = Path(args.output_dir)
         if output_dir:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            (output_dir / f"{summary.strategy_name}.md").write_text(report, encoding="utf-8")
-            (output_dir / f"{summary.strategy_name}.json").write_text(
-                json.dumps(summary.model_dump(mode="json"), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-        print(report)
+            write_signal_research_artifacts(output_dir, bars=bars_1d, report=report, registry=registry)
+        print(render_signal_research_markdown(report))
         return 0
 
     config = PipelineConfig(
@@ -166,6 +174,10 @@ def main(argv: list[str] | None = None) -> int:
             max_existing_position_pct=args.max_existing_position_pct,
             min_cash_pct=args.min_cash_pct,
             max_hourly_return_vol=args.max_hourly_return_vol,
+            max_recent_drawdown_pct=args.max_recent_drawdown_pct,
+            max_downside_volatility=args.max_downside_volatility,
+            max_single_hour_loss_pct=args.max_single_hour_loss_pct,
+            max_portfolio_risk_budget_pct=args.max_portfolio_risk_budget_pct,
         ),
     )
     result = run_daily_pipeline(config=config)

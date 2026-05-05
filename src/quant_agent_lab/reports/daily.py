@@ -43,6 +43,10 @@ def render_daily_report(
         for opinion in opinions
     )
     risk_reasons = "\n".join(f"- {reason}" for reason in risk_decision.reasons) or "- none"
+    risk_metrics = (
+        "\n".join(f"- `{key}`: {value}" for key, value in sorted(risk_decision.risk_metrics.items()))
+        or "- none"
+    )
     evidence = "\n".join(f"- `{item}`" for item in recommendation.evidence_ids[:20])
     rationale = "\n".join(f"- {item}" for item in recommendation.rationale) or "- none"
     risk_flags = "\n".join(f"- {item}" for item in recommendation.risk_flags) or "- none"
@@ -94,6 +98,10 @@ Risk flags:
 Reasons:
 
 {risk_reasons}
+
+Metrics:
+
+{risk_metrics}
 
 ## Advisory Interpretation
 

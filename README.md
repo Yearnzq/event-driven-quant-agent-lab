@@ -59,6 +59,10 @@ See `docs/architecture.md` for the initial system design.
 - Stage 2 offline gate: `scripts/stage_02_gate.py`
 - Stage 3 review checklist: `docs/stage-03-review-checklist.zh.md`
 - Stage 3 offline gate: `scripts/stage_03_gate.py`
+- Stage 4 review checklist: `docs/stage-04-review-checklist.zh.md`
+- Stage 4 offline gate: `scripts/stage_04_gate.py`
+- Stage 5 review checklist: `docs/stage-05-review-checklist.zh.md`
+- Stage 5 offline gate: `scripts/stage_05_gate.py`
 - Chinese implementation roadmap: `docs/roadmap.zh.md`
 - Additional open-source project research: `docs/additional-research.zh.md`
 - Optimized implementation path: `docs/implementation-path.zh.md`
@@ -126,6 +130,11 @@ The Phase 1.1 risk gate also checks existing position size, cash buffer, and
 hourly return volatility. These checks are advisory-only: `order_allowed`
 remains `false` in Phase 1.
 
+The Phase 5 risk gate extends deterministic checks with recent drawdown,
+downside volatility, single-hour loss, and portfolio risk budget metrics. These
+metrics are written into report JSON/Markdown and remain advisory-only:
+`order_allowed=false`, `human_required=true`.
+
 Download public Binance OHLCV data without API keys:
 
 ```bash
@@ -151,6 +160,18 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --evaluate-signals \
   --csv-dir sample_data/binance_btc_usdt \
   --output-dir artifacts/research
+```
+
+Phase 4 evaluates the default signal registry, currently including MA crossover,
+breakout, and volatility-regime signals. The research output is advisory-only
+and writes:
+
+```text
+artifacts/research/signal-registry.json
+artifacts/research/signal_research_report.md
+artifacts/research/signal_research_report.json
+artifacts/research/artifact-catalog.json
+artifacts/research/run-manifest.json
 ```
 
 Clean raw news/web JSONL before any agent sees it:

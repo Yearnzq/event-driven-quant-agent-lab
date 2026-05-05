@@ -56,6 +56,10 @@ def run_daily_pipeline(
         max_existing_position_pct=config.risk.max_existing_position_pct,
         min_cash_pct=config.risk.min_cash_pct,
         max_hourly_return_vol=config.risk.max_hourly_return_vol,
+        max_recent_drawdown_pct=config.risk.max_recent_drawdown_pct,
+        max_downside_volatility=config.risk.max_downside_volatility,
+        max_single_hour_loss_pct=config.risk.max_single_hour_loss_pct,
+        max_portfolio_risk_budget_pct=config.risk.max_portfolio_risk_budget_pct,
     ).evaluate(recommendation, market=market, signals=signals)
     report = render_daily_report(
         run_id=current_run_id,

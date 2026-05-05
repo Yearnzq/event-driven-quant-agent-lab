@@ -160,7 +160,11 @@ def write_run_manifest(
     return write_json(output_dir / "run-manifest.json", manifest.model_dump(mode="json"))
 
 
-def validate_run_manifest(output_dir: Path) -> RunManifestValidation:
+def validate_run_manifest(
+    output_dir: Path,
+    *,
+    required_roles: set[str] | None = None,
+) -> RunManifestValidation:
     reasons: list[str] = []
     manifest_path = output_dir / "run-manifest.json"
     catalog_path = output_dir / "artifact-catalog.json"
@@ -195,7 +199,8 @@ def validate_run_manifest(output_dir: Path) -> RunManifestValidation:
         reasons.append("artifact catalog must keep human_required=true")
 
     roles = {artifact.role for artifact in catalog.artifacts}
-    for required_role in {"report_markdown", "result_json", "audit_json", "audit_log"}:
+    required_roles = required_roles or {"report_markdown", "result_json", "audit_json", "audit_log"}
+    for required_role in required_roles:
         if required_role not in roles:
             reasons.append(f"required artifact missing from catalog: {required_role}")
 
