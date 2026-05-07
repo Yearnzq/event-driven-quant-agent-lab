@@ -63,6 +63,45 @@ class MockRecommendationDraftAgent:
         )
 
 
+class MockNoTradeAgent:
+    name = "mock_no_trade"
+
+    def run(self, market: MarketSnapshot, signals: SignalBundle) -> AgentOpinion:
+        return AgentOpinion(
+            agent_name=self.name,
+            status=GateStatus.PASS,
+            action_bias=Action.NO_TRADE,
+            confidence=0.72,
+            rationale=["no-trade mock blocks action when evidence is not decisive"],
+            risk_flags=["agent_no_trade"],
+            evidence_ids=signals.evidence_ids,
+            generated_at=market.as_of,
+        )
+
+
+class MockContrarianAgent:
+    name = "mock_contrarian"
+
+    def run(self, market: MarketSnapshot, signals: SignalBundle) -> AgentOpinion:
+        return AgentOpinion(
+            agent_name=self.name,
+            status=GateStatus.PASS,
+            action_bias=Action.SELL,
+            confidence=0.55,
+            rationale=["contrarian mock deliberately challenges bullish consensus"],
+            risk_flags=["directional_conflict"],
+            evidence_ids=signals.evidence_ids,
+            generated_at=market.as_of,
+        )
+
+
+class MockFailingAgent:
+    name = "mock_failing_agent"
+
+    def run(self, market: MarketSnapshot, signals: SignalBundle) -> AgentOpinion:
+        raise RuntimeError("deterministic mock failure")
+
+
 def default_mock_agents() -> list[object]:
     return [
         MockHistoricalContextAgent(),

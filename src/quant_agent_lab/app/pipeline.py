@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quant_agent_lab.agents.base import TypedAgent
 from quant_agent_lab.agents.mock import default_mock_agents
 from quant_agent_lab.core.config import PipelineConfig
 from quant_agent_lab.core.events import run_id
-from quant_agent_lab.core.schemas import AdvisoryResult
+from quant_agent_lab.core.schemas import Action, AdvisoryResult, AgentOpinion, GateStatus
 from quant_agent_lab.data.audit import (
     AuditRecord,
     append_jsonl,
@@ -38,17 +39,41 @@ def _load_market(config: PipelineConfig):
     raise ValueError(f"unsupported data source: {config.data_source}")
 
 
+def _run_agents_safely(market, signals, agents: list[TypedAgent]) -> list[AgentOpinion]:
+    opinions: list[AgentOpinion] = []
+    for agent in agents:
+        agent_name = getattr(agent, "name", agent.__class__.__name__)
+        try:
+            opinions.append(agent.run(market, signals))
+        except Exception as exc:
+            opinions.append(
+                AgentOpinion(
+                    agent_name=agent_name,
+                    status=GateStatus.FAIL,
+                    action_bias=Action.INSUFFICIENT_EVIDENCE,
+                    confidence=0.0,
+                    rationale=[f"{agent_name} failed; degraded to insufficient evidence"],
+                    risk_flags=[f"agent_failed:{agent_name}"],
+                    evidence_ids=signals.evidence_ids,
+                    error_message=str(exc),
+                    generated_at=market.as_of,
+                )
+            )
+    return opinions
+
+
 def run_daily_pipeline(
     symbol: str = "BTC-USDT",
     output_dir: Path | None = None,
     config: PipelineConfig | None = None,
+    agents: list[TypedAgent] | None = None,
 ) -> AdvisoryResult:
     config = config or PipelineConfig(symbol=symbol, output_dir=output_dir or Path("artifacts/reports"))
     market = _load_market(config)
     current_run_id = run_id(config.symbol, market.as_of)
     data_validation = validate_market_snapshot(market)
     signals = build_signal_bundle(market)
-    opinions = [agent.run(market, signals) for agent in default_mock_agents()]
+    opinions = _run_agents_safely(market, signals, agents or default_mock_agents())
     recommendation = build_recommendation_draft(signals, data_validation, opinions)
     risk_decision = RiskGate(
         max_position_pct=config.risk.max_position_pct,

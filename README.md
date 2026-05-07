@@ -63,6 +63,8 @@ See `docs/architecture.md` for the initial system design.
 - Stage 4 offline gate: `scripts/stage_04_gate.py`
 - Stage 5 review checklist: `docs/stage-05-review-checklist.zh.md`
 - Stage 5 offline gate: `scripts/stage_05_gate.py`
+- Stage 6 review checklist: `docs/stage-06-review-checklist.zh.md`
+- Stage 6 offline gate: `scripts/stage_06_gate.py`
 - Chinese implementation roadmap: `docs/roadmap.zh.md`
 - Additional open-source project research: `docs/additional-research.zh.md`
 - Optimized implementation path: `docs/implementation-path.zh.md`
@@ -134,6 +136,15 @@ The Phase 5 risk gate extends deterministic checks with recent drawdown,
 downside volatility, single-hour loss, and portfolio risk budget metrics. These
 metrics are written into report JSON/Markdown and remain advisory-only:
 `order_allowed=false`, `human_required=true`.
+
+Phase 6 strengthens the advisory decision layer. Agent failures are converted
+into schema-valid failed opinions, committee disagreement is written into a
+`phase6.decision_trace.v1`, and review/no-trade/insufficient-evidence fallbacks
+remain advisory-only:
+
+```bash
+PYTHONPATH=src python scripts/stage_06_gate.py
+```
 
 Download public Binance OHLCV data without API keys:
 

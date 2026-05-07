@@ -187,7 +187,20 @@ class AgentOpinion(BaseModel):
     rationale: list[str]
     risk_flags: list[str] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
+    error_message: str | None = None
     generated_at: datetime
+
+
+class DecisionTrace(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase6.decision_trace.v1"] = "phase6.decision_trace.v1"
+    opinion_count: int = Field(ge=0)
+    passed_agent_count: int = Field(ge=0)
+    failed_agent_count: int = Field(ge=0)
+    action_vote_counts: dict[str, int] = Field(default_factory=dict)
+    disagreement_reasons: list[str] = Field(default_factory=list)
+    fallback_reasons: list[str] = Field(default_factory=list)
 
 
 class RecommendationDraft(BaseModel):
@@ -204,6 +217,13 @@ class RecommendationDraft(BaseModel):
     model_disagreement: ModelDisagreement
     rationale: list[str]
     risk_flags: list[str] = Field(default_factory=list)
+    decision_trace: DecisionTrace = Field(
+        default_factory=lambda: DecisionTrace(
+            opinion_count=0,
+            passed_agent_count=0,
+            failed_agent_count=0,
+        )
+    )
     human_required: bool = True
     order_allowed: bool = False
     generated_at: datetime

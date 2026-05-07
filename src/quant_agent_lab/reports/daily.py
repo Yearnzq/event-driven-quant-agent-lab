@@ -39,9 +39,14 @@ def render_daily_report(
         for signal in signals.signals
     )
     opinion_lines = "\n".join(
-        f"- `{opinion.agent_name}`: {opinion.action_bias}, confidence={opinion.confidence}"
+        f"- `{opinion.agent_name}`: {opinion.action_bias}, status={_value(opinion.status)}, confidence={opinion.confidence}"
         for opinion in opinions
     )
+    agent_failures = "\n".join(
+        f"- `{opinion.agent_name}`: {opinion.error_message or 'unknown error'}"
+        for opinion in opinions
+        if opinion.status.value == "fail"
+    ) or "- none"
     risk_reasons = "\n".join(f"- {reason}" for reason in risk_decision.reasons) or "- none"
     risk_metrics = (
         "\n".join(f"- `{key}`: {value}" for key, value in sorted(risk_decision.risk_metrics.items()))
@@ -50,6 +55,21 @@ def render_daily_report(
     evidence = "\n".join(f"- `{item}`" for item in recommendation.evidence_ids[:20])
     rationale = "\n".join(f"- {item}" for item in recommendation.rationale) or "- none"
     risk_flags = "\n".join(f"- {item}" for item in recommendation.risk_flags) or "- none"
+    vote_counts = (
+        "\n".join(
+            f"- `{action}`: {count}"
+            for action, count in sorted(recommendation.decision_trace.action_vote_counts.items())
+        )
+        or "- none"
+    )
+    disagreement_reasons = (
+        "\n".join(f"- {item}" for item in recommendation.decision_trace.disagreement_reasons)
+        or "- none"
+    )
+    fallback_reasons = (
+        "\n".join(f"- {item}" for item in recommendation.decision_trace.fallback_reasons)
+        or "- none"
+    )
     return f"""# Daily Advisory Report
 
 Run: `{run_id}`
@@ -70,6 +90,10 @@ Reasons: `{data_validation.reasons or []}`
 
 {opinion_lines}
 
+Agent failures:
+
+{agent_failures}
+
 ## Recommendation Draft
 
 - Action: `{_value(recommendation.action)}`
@@ -88,6 +112,25 @@ Rationale:
 Risk flags:
 
 {risk_flags}
+
+## Decision Trace
+
+- Schema: `{recommendation.decision_trace.schema_version}`
+- Opinions: `{recommendation.decision_trace.opinion_count}`
+- Passed agents: `{recommendation.decision_trace.passed_agent_count}`
+- Failed agents: `{recommendation.decision_trace.failed_agent_count}`
+
+Vote counts:
+
+{vote_counts}
+
+Disagreement reasons:
+
+{disagreement_reasons}
+
+Fallback reasons:
+
+{fallback_reasons}
 
 ## Risk Gate
 
