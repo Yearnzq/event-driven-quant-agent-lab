@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
+from quant_agent_lab.core.config import RiskConfig
 from quant_agent_lab.core.schemas import (
     Action,
     CleanedTextEvidence,
@@ -78,3 +79,10 @@ def test_news_event_can_be_cleaned_text_evidence() -> None:
     cleaned = CleanedTextEvidence.from_news_event(event)
     assert cleaned.evidence_id == event.evidence_id
     assert cleaned.summary == event.summary
+
+
+def test_risk_config_is_frozen() -> None:
+    config = RiskConfig()
+
+    with pytest.raises(ValidationError):
+        config.max_position_pct = 0.5

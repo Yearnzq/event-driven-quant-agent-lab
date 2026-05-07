@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quant_agent_lab.core.schemas import Bar, MarketSnapshot
+from quant_agent_lab.data.metadata import write_dataset_manifest
 from quant_agent_lab.data.mock import load_mock_market_snapshot
 
 
@@ -125,4 +126,16 @@ def write_sample_csv_dataset(
     write_bars_csv(output_dir / "bars_1h.csv", snapshot.bars_1h)
     write_bars_csv(output_dir / "bars_1d.csv", snapshot.bars_1d)
     write_portfolio_json(output_dir / "portfolio.json", snapshot)
+    write_dataset_manifest(output_dir, symbol=symbol, as_of=snapshot.as_of, source="sample")
+    return output_dir
+
+
+def write_bad_csv_dataset(output_dir: Path, *, symbol: str = "BTC-USDT") -> Path:
+    snapshot = load_mock_market_snapshot(symbol=symbol)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    broken_hourly = snapshot.bars_1h[:10] + snapshot.bars_1h[11:]
+    write_bars_csv(output_dir / "bars_1h.csv", broken_hourly)
+    write_bars_csv(output_dir / "bars_1d.csv", snapshot.bars_1d)
+    write_portfolio_json(output_dir / "portfolio.json", snapshot)
+    write_dataset_manifest(output_dir, symbol=symbol, as_of=snapshot.as_of, source="bad-sample")
     return output_dir

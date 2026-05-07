@@ -15,6 +15,10 @@ class RiskConfig(BaseModel):
     max_existing_position_pct: float = Field(default=0.25, ge=0, le=1)
     min_cash_pct: float = Field(default=0.05, ge=0, le=1)
     max_hourly_return_vol: float = Field(default=0.03, ge=0, le=1)
+    max_recent_drawdown_pct: float = Field(default=0.12, ge=0, le=1)
+    max_downside_volatility: float = Field(default=0.025, ge=0, le=1)
+    max_single_hour_loss_pct: float = Field(default=0.08, ge=0, le=1)
+    max_portfolio_risk_budget_pct: float = Field(default=0.01, ge=0, le=1)
 
 
 class CsvDataConfig(BaseModel):

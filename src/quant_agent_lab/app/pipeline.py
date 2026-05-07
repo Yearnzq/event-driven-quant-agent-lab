@@ -6,7 +6,14 @@ from quant_agent_lab.agents.mock import default_mock_agents
 from quant_agent_lab.core.config import PipelineConfig
 from quant_agent_lab.core.events import run_id
 from quant_agent_lab.core.schemas import AdvisoryResult
-from quant_agent_lab.data.audit import AuditRecord, append_jsonl, stable_hash, write_json
+from quant_agent_lab.data.audit import (
+    AuditRecord,
+    append_jsonl,
+    stable_hash,
+    write_artifact_catalog,
+    write_json,
+    write_run_manifest,
+)
 from quant_agent_lab.data.csv_loader import load_csv_market_snapshot
 from quant_agent_lab.data.mock import load_mock_market_snapshot
 from quant_agent_lab.data.validation import validate_market_snapshot
@@ -49,6 +56,10 @@ def run_daily_pipeline(
         max_existing_position_pct=config.risk.max_existing_position_pct,
         min_cash_pct=config.risk.min_cash_pct,
         max_hourly_return_vol=config.risk.max_hourly_return_vol,
+        max_recent_drawdown_pct=config.risk.max_recent_drawdown_pct,
+        max_downside_volatility=config.risk.max_downside_volatility,
+        max_single_hour_loss_pct=config.risk.max_single_hour_loss_pct,
+        max_portfolio_risk_budget_pct=config.risk.max_portfolio_risk_budget_pct,
     ).evaluate(recommendation, market=market, signals=signals)
     report = render_daily_report(
         run_id=current_run_id,
@@ -73,20 +84,49 @@ def run_daily_pipeline(
     target_dir = output_dir or config.output_dir
     if target_dir is not None:
         target_dir.mkdir(parents=True, exist_ok=True)
-        (target_dir / f"{current_run_id}.md").write_text(report, encoding="utf-8")
+        report_path = target_dir / f"{current_run_id}.md"
+        result_path = target_dir / f"{current_run_id}.json"
+        audit_path = target_dir / f"{current_run_id}.audit.json"
+        audit_log_path = target_dir / "audit-log.jsonl"
+
+        report_path.write_text(report, encoding="utf-8")
         result_payload = result.model_dump(mode="json")
-        write_json(target_dir / f"{current_run_id}.json", result_payload)
+        write_json(result_path, result_payload)
+        input_hash = stable_hash(
+            {
+                "market": market.model_dump(mode="json"),
+                "config": config.model_dump(mode="json"),
+            }
+        )
+        output_hash = stable_hash(result_payload)
+        config_hash = stable_hash(config.model_dump(mode="json"))
         audit_record = AuditRecord(
             run_id=current_run_id,
-            input_hash=stable_hash(
-                {
-                    "market": market.model_dump(mode="json"),
-                    "config": config.model_dump(mode="json"),
-                }
-            ),
-            output_hash=stable_hash(result_payload),
+            input_hash=input_hash,
+            output_hash=output_hash,
             validation_result=data_validation.status.value,
         )
-        write_json(target_dir / f"{current_run_id}.audit.json", audit_record.model_dump(mode="json"))
-        append_jsonl(target_dir / "audit-log.jsonl", audit_record.model_dump(mode="json"))
+        write_json(audit_path, audit_record.model_dump(mode="json"))
+        append_jsonl(audit_log_path, audit_record.model_dump(mode="json"))
+        catalog_path = write_artifact_catalog(
+            target_dir,
+            run_id=current_run_id,
+            artifacts=[
+                ("report_markdown", report_path),
+                ("result_json", result_path),
+                ("audit_json", audit_path),
+                ("audit_log", audit_log_path),
+            ],
+        )
+        write_run_manifest(
+            target_dir,
+            run_id=current_run_id,
+            symbol=config.symbol,
+            as_of=market.as_of,
+            input_hash=input_hash,
+            output_hash=output_hash,
+            config_hash=config_hash,
+            validation_result=data_validation.status.value,
+            artifact_catalog_path=catalog_path,
+        )
     return result

@@ -115,6 +115,8 @@ artifacts/reports/audit-log.jsonl
 - Risk Gate 增强：新增当前仓位上限、现金缓冲、小时收益波动率检查。
 - Daily report 增强：新增 rationale、risk flags、advisory interpretation 和“非自动交易指令”说明。
 - 真实只读行情入口：新增 Binance 公共 Kline 下载器，不需要 API key，只写入 CSV/JSON，本阶段不触碰交易或账户接口。
+- 研究评估入口：新增 `--evaluate-signals`，可对标准 CSV 日线做离线均线交叉信号评估，输出 Markdown/JSON。该功能只用于研究诊断，不生成订单。
+- 文本证据清洗入口：新增 `--clean-news-jsonl`，把原始新闻/网页 JSONL 转成 `CleanedTextEvidence` JSONL，输出只保留标题、摘要、实体、发布时间、相关度和哈希，不保留原文。
 
 仍然保持 Phase 1 约束：
 

@@ -51,6 +51,18 @@ See `docs/architecture.md` for the initial system design.
 
 ## Planning
 
+- Ten-stage implementation roadmap: `docs/ten-stage-roadmap.zh.md`
+- Requirements alignment: `docs/requirements-alignment.zh.md`
+- Stage 1 review checklist: `docs/stage-01-review-checklist.zh.md`
+- Stage 1 offline gate: `scripts/stage_01_gate.py`
+- Stage 2 review checklist: `docs/stage-02-review-checklist.zh.md`
+- Stage 2 offline gate: `scripts/stage_02_gate.py`
+- Stage 3 review checklist: `docs/stage-03-review-checklist.zh.md`
+- Stage 3 offline gate: `scripts/stage_03_gate.py`
+- Stage 4 review checklist: `docs/stage-04-review-checklist.zh.md`
+- Stage 4 offline gate: `scripts/stage_04_gate.py`
+- Stage 5 review checklist: `docs/stage-05-review-checklist.zh.md`
+- Stage 5 offline gate: `scripts/stage_05_gate.py`
 - Chinese implementation roadmap: `docs/roadmap.zh.md`
 - Additional open-source project research: `docs/additional-research.zh.md`
 - Optimized implementation path: `docs/implementation-path.zh.md`
@@ -99,9 +111,29 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --write-sample-data sample_data/btc_usdt
 ```
 
+The sample dataset writes a Phase 2 `metadata.json` manifest with file hashes,
+schema version, `order_allowed=false`, and `human_required=true`. Validate it:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --validate-dataset sample_data/btc_usdt
+```
+
+Generate a deterministic bad CSV dataset for Data Gate failure checks:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --write-bad-sample-data sample_data/bad_btc_usdt
+```
+
 The Phase 1.1 risk gate also checks existing position size, cash buffer, and
 hourly return volatility. These checks are advisory-only: `order_allowed`
 remains `false` in Phase 1.
+
+The Phase 5 risk gate extends deterministic checks with recent drawdown,
+downside volatility, single-hour loss, and portfolio risk budget metrics. These
+metrics are written into report JSON/Markdown and remain advisory-only:
+`order_allowed=false`, `human_required=true`.
 
 Download public Binance OHLCV data without API keys:
 
@@ -120,3 +152,46 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --csv-dir sample_data/binance_btc_usdt \
   --output-dir artifacts/reports
 ```
+
+Evaluate the deterministic MA crossover signal offline:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --evaluate-signals \
+  --csv-dir sample_data/binance_btc_usdt \
+  --output-dir artifacts/research
+```
+
+Phase 4 evaluates the default signal registry, currently including MA crossover,
+breakout, and volatility-regime signals. The research output is advisory-only
+and writes:
+
+```text
+artifacts/research/signal-registry.json
+artifacts/research/signal_research_report.md
+artifacts/research/signal_research_report.json
+artifacts/research/artifact-catalog.json
+artifacts/research/run-manifest.json
+```
+
+Clean raw news/web JSONL before any agent sees it:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --clean-news-jsonl raw_news.jsonl \
+  --cleaned-news-output artifacts/evidence/cleaned_news.jsonl
+```
+
+Input rows should include `published_at`, `title`, and one of `content`,
+`body`, `text`, or `summary`. Output rows intentionally omit raw bodies.
+
+Every advisory pipeline run writes a Phase 3 audit ledger beside the report:
+
+```text
+artifact-catalog.json
+run-manifest.json
+```
+
+The catalog records report, result JSON, audit JSON, and audit-log file hashes.
+The run manifest records input, output, config, and catalog hashes while keeping
+`order_allowed=false` and `human_required=true`.

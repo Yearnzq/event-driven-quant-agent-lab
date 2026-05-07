@@ -8,7 +8,16 @@ from pathlib import Path
 from quant_agent_lab.app.pipeline import run_daily_pipeline
 from quant_agent_lab.core.config import CsvDataConfig, PipelineConfig, RiskConfig
 from quant_agent_lab.data.connectors import write_binance_csv_dataset
-from quant_agent_lab.data.importers import write_sample_csv_dataset
+from quant_agent_lab.data.csv_loader import load_bars_csv
+from quant_agent_lab.data.importers import write_bad_csv_dataset, write_sample_csv_dataset
+from quant_agent_lab.data.metadata import validate_dataset_manifest
+from quant_agent_lab.data.text_cleaning import clean_news_jsonl
+from quant_agent_lab.research.evaluation import (
+    build_signal_research_report,
+    default_signal_registry,
+    render_signal_research_markdown,
+    write_signal_research_artifacts,
+)
 
 
 def _parse_as_of(value: str) -> datetime:
@@ -33,7 +42,12 @@ def _load_csv_dir(csv_dir: Path) -> tuple[CsvDataConfig, datetime | None]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run Phase 1 daily advisory pipeline.")
     parser.add_argument("--write-sample-data", help="Write a deterministic CSV sample dataset and exit.")
+    parser.add_argument("--write-bad-sample-data", help="Write deterministic bad CSV samples for Data Gate tests and exit.")
+    parser.add_argument("--validate-dataset", help="Validate a CSV dataset metadata manifest and exit.")
     parser.add_argument("--download-binance-data", help="Download public Binance OHLCV CSV data and exit.")
+    parser.add_argument("--evaluate-signals", action="store_true", help="Evaluate deterministic signals on CSV daily bars and exit.")
+    parser.add_argument("--clean-news-jsonl", help="Clean raw news/web JSONL into schema-safe text evidence and exit.")
+    parser.add_argument("--cleaned-news-output", help="Output path for --clean-news-jsonl.")
     parser.add_argument("--symbol", default="BTC-USDT")
     parser.add_argument("--as-of", help="UTC as-of timestamp for CSV runs, e.g. 2026-04-29T00:00:00Z.")
     parser.add_argument("--output-dir", default="artifacts/reports")
@@ -44,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--portfolio-json")
     parser.add_argument("--hourly-limit", type=int, default=72)
     parser.add_argument("--daily-limit", type=int, default=45)
+    parser.add_argument("--fast-window", type=int, default=7)
+    parser.add_argument("--slow-window", type=int, default=30)
+    parser.add_argument("--breakout-window", type=int, default=20)
+    parser.add_argument("--volatility-window", type=int, default=20)
+    parser.add_argument("--volatility-threshold", type=float, default=0.03)
+    parser.add_argument("--horizon", type=int, default=1)
     parser.add_argument("--portfolio-equity", type=float, default=100000.0)
     parser.add_argument("--portfolio-cash", type=float, default=100000.0)
     parser.add_argument("--position-pct", type=float, default=0.0)
@@ -52,12 +72,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-existing-position-pct", type=float, default=0.25)
     parser.add_argument("--min-cash-pct", type=float, default=0.05)
     parser.add_argument("--max-hourly-return-vol", type=float, default=0.03)
+    parser.add_argument("--max-recent-drawdown-pct", type=float, default=0.12)
+    parser.add_argument("--max-downside-volatility", type=float, default=0.025)
+    parser.add_argument("--max-single-hour-loss-pct", type=float, default=0.08)
+    parser.add_argument("--max-portfolio-risk-budget-pct", type=float, default=0.01)
     args = parser.parse_args(argv)
 
     if args.write_sample_data:
         output_dir = write_sample_csv_dataset(Path(args.write_sample_data), symbol=args.symbol)
         print(f"Wrote sample dataset to {output_dir}")
         return 0
+
+    if args.write_bad_sample_data:
+        output_dir = write_bad_csv_dataset(Path(args.write_bad_sample_data), symbol=args.symbol)
+        print(f"Wrote bad sample dataset to {output_dir}")
+        return 0
+
+    if args.validate_dataset:
+        result = validate_dataset_manifest(Path(args.validate_dataset))
+        print(result.model_dump_json(indent=2))
+        return 0 if result.status == "pass" else 1
 
     if args.download_binance_data:
         output_dir = write_binance_csv_dataset(
@@ -72,6 +106,13 @@ def main(argv: list[str] | None = None) -> int:
         metadata = output_dir / "metadata.json"
         print(f"Wrote Binance public market dataset to {output_dir}")
         print(f"Metadata: {metadata}")
+        return 0
+
+    if args.clean_news_jsonl:
+        if not args.cleaned_news_output:
+            parser.error("--clean-news-jsonl requires --cleaned-news-output")
+        output_path = clean_news_jsonl(Path(args.clean_news_jsonl), Path(args.cleaned_news_output))
+        print(f"Wrote cleaned text evidence to {output_path}")
         return 0
 
     csv_config = None
@@ -96,6 +137,31 @@ def main(argv: list[str] | None = None) -> int:
                 bars_1d_csv=Path(args.bars_1d_csv),
                 portfolio_json=Path(args.portfolio_json),
             )
+
+    if args.evaluate_signals:
+        bars_1d_csv = csv_config.bars_1d_csv if csv_config is not None else None
+        if bars_1d_csv is None and args.bars_1d_csv:
+            bars_1d_csv = Path(args.bars_1d_csv)
+        if bars_1d_csv is None:
+            parser.error("--evaluate-signals requires --csv-dir or --bars-1d-csv")
+        bars_1d = load_bars_csv(bars_1d_csv, symbol=args.symbol, timeframe="1d")
+        try:
+            registry = default_signal_registry(
+                fast_window=args.fast_window,
+                slow_window=args.slow_window,
+                breakout_window=args.breakout_window,
+                volatility_window=args.volatility_window,
+                volatility_threshold=args.volatility_threshold,
+            )
+            report = build_signal_research_report(bars_1d, registry=registry, horizon=args.horizon)
+        except ValueError as exc:
+            parser.error(str(exc))
+        output_dir = Path(args.output_dir)
+        if output_dir:
+            write_signal_research_artifacts(output_dir, bars=bars_1d, report=report, registry=registry)
+        print(render_signal_research_markdown(report))
+        return 0
+
     config = PipelineConfig(
         symbol=args.symbol,
         as_of=_parse_as_of(args.as_of) if args.as_of else metadata_as_of or PipelineConfig().as_of,
@@ -108,6 +174,10 @@ def main(argv: list[str] | None = None) -> int:
             max_existing_position_pct=args.max_existing_position_pct,
             min_cash_pct=args.min_cash_pct,
             max_hourly_return_vol=args.max_hourly_return_vol,
+            max_recent_drawdown_pct=args.max_recent_drawdown_pct,
+            max_downside_volatility=args.max_downside_volatility,
+            max_single_hour_loss_pct=args.max_single_hour_loss_pct,
+            max_portfolio_risk_budget_pct=args.max_portfolio_risk_budget_pct,
         ),
     )
     result = run_daily_pipeline(config=config)

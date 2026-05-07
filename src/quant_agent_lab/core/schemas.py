@@ -227,6 +227,7 @@ class RiskDecision(BaseModel):
     final_action: Action
     order_allowed: bool = False
     reasons: list[str] = Field(default_factory=list)
+    risk_metrics: dict[str, float] = Field(default_factory=dict)
     checked_at: datetime
 
     @model_validator(mode="after")
