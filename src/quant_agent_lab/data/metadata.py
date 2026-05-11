@@ -97,6 +97,7 @@ def build_dataset_manifest(
             _asset(dataset_dir, "bars_1d", bars_1d_csv),
             _asset(dataset_dir, "portfolio", portfolio_json),
         ],
+        quality_rules=quality_rules,
     )
 
 

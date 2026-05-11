@@ -52,6 +52,8 @@ def run_stage_06_gate(output_dir: Path) -> None:
     _assert("agent_failed:mock_failing_agent" in failure_result.recommendation.decision_trace.fallback_reasons, "failure fallback reason missing")
     _assert(failure_result.risk_decision.order_allowed is False, "failure scenario allowed orders")
     _assert("Decision Trace" in failure_result.report_markdown, "decision trace missing from report")
+    _assert("RuntimeError: redacted" in failure_result.report_markdown, "redacted error summary missing")
+    _assert("deterministic mock failure" not in failure_result.report_markdown, "raw exception leaked into report")
     _validate_manifest(failure_dir)
 
     conflict_result = run_daily_pipeline(
@@ -76,9 +78,12 @@ def run_stage_06_gate(output_dir: Path) -> None:
     result_payload = json.loads((failure_dir / f"{failure_result.run_id}.json").read_text(encoding="utf-8"))
     _assert("decision_trace" in result_payload["recommendation"], "decision trace missing from result JSON")
     _assert(result_payload["recommendation"]["decision_trace"]["schema_version"] == "phase6.decision_trace.v1", "decision trace schema mismatch")
+    failed_opinions = [opinion for opinion in result_payload["agent_opinions"] if opinion["status"] == "fail"]
+    _assert(failed_opinions[0]["error_message"] == "RuntimeError: redacted", "raw exception was not redacted")
 
     print(f"STAGE_06_OFFLINE_GATE=PASS output_dir={output_dir}")
     print("AGENT_FAILURE_DEGRADATION_CHECK=PASS")
+    print("AGENT_ERROR_REDACTION_CHECK=PASS")
     print("DISAGREEMENT_EXPLANATION_CHECK=PASS")
     print("NO_TRADE_DECISION_CHECK=PASS")
     print("INSUFFICIENT_EVIDENCE_FALLBACK_CHECK=PASS")

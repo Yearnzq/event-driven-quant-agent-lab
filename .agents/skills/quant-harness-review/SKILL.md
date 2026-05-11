@@ -51,7 +51,11 @@ For Phase 1 review, prefer:
 docker exec quant-agent-lab bash -lc '
 cd /workspace/event-driven-quant-agent-lab
 source /opt/miniconda3/etc/profile.d/conda.sh
-conda activate quant
+if conda env list | awk '{print $1}' | grep -qx quant; then
+  conda activate quant
+else
+  conda activate medi
+fi
 
 python --version
 python -m pytest -q

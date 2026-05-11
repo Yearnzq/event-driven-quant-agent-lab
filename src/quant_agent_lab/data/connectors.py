@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from quant_agent_lab.data.metadata import build_dataset_manifest
 
 BINANCE_MARKET_DATA_BASE_URL = "https://data-api.binance.vision"
 BINANCE_INTERVALS = {"1h": "1h", "1d": "1d"}
+PUBLIC_DATA_NETWORK_ENABLE_ENV = "QAL_ALLOW_PUBLIC_DATA_NETWORK"
 
 
 def _project_symbol_to_binance(symbol: str) -> str:
@@ -37,7 +39,16 @@ def fetch_binance_klines(
     timeframe: str,
     limit: int,
     base_url: str = BINANCE_MARKET_DATA_BASE_URL,
+    allow_network: bool = False,
 ) -> list[Bar]:
+    """Fetch public research OHLCV data.
+
+    This connector is best-effort and public-data only. It is not broker,
+    account, private API, paper-trading, or live-trading integration.
+    """
+
+    if not allow_network and os.environ.get(PUBLIC_DATA_NETWORK_ENABLE_ENV) != "1":
+        raise RuntimeError("public data network access requires explicit allow_network")
     if timeframe not in BINANCE_INTERVALS:
         raise ValueError(f"unsupported Binance timeframe: {timeframe}")
     if limit < 1 or limit > 1000:
@@ -83,6 +94,7 @@ def write_binance_csv_dataset(
     cash: float = 100_000.0,
     position_pct: float = 0.0,
     base_url: str = BINANCE_MARKET_DATA_BASE_URL,
+    allow_network: bool = False,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     bars_1h = fetch_binance_klines(
@@ -90,12 +102,14 @@ def write_binance_csv_dataset(
         timeframe="1h",
         limit=hourly_limit,
         base_url=base_url,
+        allow_network=allow_network,
     )
     bars_1d = fetch_binance_klines(
         symbol=symbol,
         timeframe="1d",
         limit=daily_limit,
         base_url=base_url,
+        allow_network=allow_network,
     )
     if not bars_1h or not bars_1d:
         raise ValueError("exchange returned empty kline data")

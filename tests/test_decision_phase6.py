@@ -23,7 +23,7 @@ def test_agent_failure_degrades_to_review_required() -> None:
     failed = [opinion for opinion in result.agent_opinions if opinion.status == GateStatus.FAIL]
     assert len(failed) == 1
     assert failed[0].action_bias == Action.INSUFFICIENT_EVIDENCE
-    assert failed[0].error_message == "deterministic mock failure"
+    assert failed[0].error_message == "RuntimeError: redacted"
     assert result.recommendation.action == Action.REVIEW_REQUIRED
     assert result.recommendation.target_position_pct == 0
     assert result.recommendation.model_disagreement == ModelDisagreement.HIGH
@@ -73,4 +73,5 @@ def test_report_includes_phase6_decision_trace() -> None:
     assert "Decision Trace" in result.report_markdown
     assert "phase6.decision_trace.v1" in result.report_markdown
     assert "Agent failures" in result.report_markdown
-    assert "deterministic mock failure" in result.report_markdown
+    assert "RuntimeError: redacted" in result.report_markdown
+    assert "deterministic mock failure" not in result.report_markdown

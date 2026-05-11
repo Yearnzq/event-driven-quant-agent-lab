@@ -376,7 +376,7 @@ def build_signal_research_report(
         reverse=True,
     )
     symbol = summaries[0].symbol if summaries else "UNKNOWN"
-    generated_at = bars[-1].ts.astimezone(timezone.utc) if bars else datetime.now(timezone.utc).replace(microsecond=0)
+    generated_at = bars[-1].ts.astimezone(timezone.utc) if bars else datetime(1970, 1, 1, tzinfo=timezone.utc)
     return SignalResearchReport(
         symbol=symbol,
         generated_at=generated_at,
@@ -493,6 +493,7 @@ def write_signal_research_artifacts(
         output_dir,
         run_id=run_id("signal-research", report.generated_at),
         artifacts=artifacts,
+        created_at=report.generated_at,
     )
     write_run_manifest(
         output_dir,
@@ -504,5 +505,6 @@ def write_signal_research_artifacts(
         config_hash=stable_hash(serialize_signal_registry(registry)),
         validation_result="research_only",
         artifact_catalog_path=catalog_path,
+        created_at=report.generated_at,
     )
     return output_dir

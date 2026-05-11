@@ -151,3 +151,9 @@ def test_risk_gate_blocks_portfolio_risk_budget() -> None:
 
     assert risk.status == GateStatus.FAIL
     assert "portfolio risk budget exceeds limit" in risk.reasons
+
+
+def test_risk_returns_handles_empty_and_short_inputs() -> None:
+    assert RiskGate._returns([]) == []
+    assert RiskGate._returns([100.0]) == []
+    assert RiskGate._returns([0.0, 100.0]) == []

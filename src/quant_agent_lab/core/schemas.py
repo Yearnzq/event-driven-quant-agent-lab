@@ -203,6 +203,179 @@ class DecisionTrace(BaseModel):
     fallback_reasons: list[str] = Field(default_factory=list)
 
 
+class PromptSpec(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase7.prompt_spec.v1"] = "phase7.prompt_spec.v1"
+    prompt_id: str
+    version: str
+    purpose: str
+    template: str
+    input_contract: list[str] = Field(default_factory=list)
+    output_schema: str
+    advisory_only: bool = True
+
+
+class RenderedPrompt(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase7.rendered_prompt.v1"] = "phase7.rendered_prompt.v1"
+    prompt_id: str
+    prompt_version: str
+    provider: Literal["fake", "openai"]
+    model_name: str
+    input_hash: str
+    prompt_hash: str
+    output_schema: str
+    rendered_prompt: str
+    created_at: datetime
+
+
+class ModelCallAuditRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase7.model_call_audit.v1"] = "phase7.model_call_audit.v1"
+    provider: Literal["fake", "openai"]
+    model_name: str
+    prompt_id: str
+    prompt_version: str
+    input_hash: str
+    prompt_hash: str
+    output_hash: str
+    output_schema: str
+    status: GateStatus
+    latency_ms: float = Field(ge=0)
+    estimated_input_tokens: int = Field(ge=0)
+    estimated_output_tokens: int = Field(ge=0)
+    estimated_cost_usd: float = Field(ge=0)
+    error_message: str | None = None
+    order_allowed: bool = False
+    human_required: bool = True
+    called_at: datetime
+
+    @model_validator(mode="after")
+    def advisory_only(self) -> "ModelCallAuditRecord":
+        if self.order_allowed:
+            raise ValueError("Phase 7 model call audit cannot allow orders")
+        if not self.human_required:
+            raise ValueError("Phase 7 model call audit must require human approval")
+        return self
+
+
+class ModelBoundaryResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase7.model_boundary_result.v1"] = "phase7.model_boundary_result.v1"
+    opinion: AgentOpinion
+    audit_record: ModelCallAuditRecord
+    prompt_registry: list[PromptSpec]
+
+
+class A2AAgentCard(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase9.agent_card.v1"] = "phase9.agent_card.v1"
+    agent_id: str
+    name: str
+    description: str
+    capabilities: list[str] = Field(default_factory=list)
+    endpoint_path: str = "/a2a/agent-opinion"
+    input_schema: str = "phase9.agent_request.v1"
+    output_schema: str = "AgentOpinion"
+    timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    max_retries: int = Field(default=1, ge=0, le=5)
+    advisory_only: bool = True
+    order_allowed: bool = False
+    human_required: bool = True
+
+    @model_validator(mode="after")
+    def advisory_only_card(self) -> "A2AAgentCard":
+        if not self.advisory_only:
+            raise ValueError("Phase 9 agent card must be advisory-only")
+        if self.order_allowed:
+            raise ValueError("Phase 9 agent card cannot allow orders")
+        if not self.human_required:
+            raise ValueError("Phase 9 agent card must require human approval")
+        return self
+
+
+class A2AAgentRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase9.agent_request.v1"] = "phase9.agent_request.v1"
+    trace_id: str
+    run_id: str
+    agent_id: str
+    market_hash: str
+    signal_hash: str
+    market: MarketSnapshot
+    signals: SignalBundle
+    created_at: datetime
+    order_allowed: bool = False
+    human_required: bool = True
+
+    @model_validator(mode="after")
+    def advisory_only_request(self) -> "A2AAgentRequest":
+        if self.order_allowed:
+            raise ValueError("Phase 9 A2A request cannot allow orders")
+        if not self.human_required:
+            raise ValueError("Phase 9 A2A request must require human approval")
+        return self
+
+
+class A2AAgentResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase9.agent_response.v1"] = "phase9.agent_response.v1"
+    trace_id: str
+    agent_id: str
+    status: GateStatus
+    opinion: AgentOpinion
+    latency_ms: float = Field(ge=0)
+    attempt_count: int = Field(ge=1)
+    error_message: str | None = None
+    received_at: datetime
+    order_allowed: bool = False
+    human_required: bool = True
+
+    @model_validator(mode="after")
+    def advisory_only_response(self) -> "A2AAgentResponse":
+        if self.order_allowed:
+            raise ValueError("Phase 9 A2A response cannot allow orders")
+        if not self.human_required:
+            raise ValueError("Phase 9 A2A response must require human approval")
+        if self.opinion.status == GateStatus.FAIL and self.opinion.action_bias != Action.INSUFFICIENT_EVIDENCE:
+            raise ValueError("failed A2A responses must degrade to insufficient evidence")
+        return self
+
+
+class A2ATraceRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal["phase9.a2a_trace.v1"] = "phase9.a2a_trace.v1"
+    trace_id: str
+    run_id: str
+    agent_id: str
+    status: GateStatus
+    attempt_count: int = Field(ge=1)
+    timeout_seconds: float = Field(gt=0)
+    latency_ms: float = Field(ge=0)
+    request_hash: str
+    response_hash: str
+    error_message: str | None = None
+    order_allowed: bool = False
+    human_required: bool = True
+    created_at: datetime
+
+    @model_validator(mode="after")
+    def advisory_only_trace(self) -> "A2ATraceRecord":
+        if self.order_allowed:
+            raise ValueError("Phase 9 A2A trace cannot allow orders")
+        if not self.human_required:
+            raise ValueError("Phase 9 A2A trace must require human approval")
+        return self
+
+
 class RecommendationDraft(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -270,7 +443,10 @@ class AdvisoryResult(BaseModel):
     recommendation: RecommendationDraft
     risk_decision: RiskDecision
     report_markdown: str
+    model_call_audits: list[ModelCallAuditRecord] = Field(default_factory=list)
+    a2a_agent_cards: list[A2AAgentCard] = Field(default_factory=list)
+    a2a_trace_records: list[A2ATraceRecord] = Field(default_factory=list)
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
+    return datetime(1970, 1, 1, tzinfo=timezone.utc)

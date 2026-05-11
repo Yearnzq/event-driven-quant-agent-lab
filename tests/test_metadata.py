@@ -15,6 +15,8 @@ def test_sample_dataset_writes_valid_phase2_manifest(tmp_path) -> None:
     assert manifest.symbol == "BTC-USDT"
     assert manifest.order_allowed is False
     assert manifest.human_required is True
+    assert "required_files_present" in manifest.quality_rules
+    assert "data_gate_checks_staleness_gaps_duplicates_symbols" in manifest.quality_rules
     assert {asset.role for asset in manifest.assets} == {"bars_1h", "bars_1d", "portfolio"}
 
 

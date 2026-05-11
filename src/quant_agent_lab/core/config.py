@@ -29,6 +29,21 @@ class CsvDataConfig(BaseModel):
     portfolio_json: Path
 
 
+class ModelProviderConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    provider: Literal["fake", "openai"] = "fake"
+    model_name: str = "fake-structured-advisory-v1"
+    prompt_registry_version: str = "phase7.prompt_registry.v1"
+    timeout_seconds: int = Field(default=30, ge=1, le=300)
+    max_prompt_chars: int = Field(default=8000, ge=100, le=50000)
+    allow_network: bool = False
+    api_key_env: str = "OPENAI_API_KEY"
+    api_base_url: str = "https://api.openai.com/v1/responses"
+    input_cost_per_million_tokens: float = Field(default=0.0, ge=0)
+    output_cost_per_million_tokens: float = Field(default=0.0, ge=0)
+
+
 class PipelineConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -38,6 +53,7 @@ class PipelineConfig(BaseModel):
     csv: CsvDataConfig | None = None
     output_dir: Path = Path("artifacts/reports")
     risk: RiskConfig = Field(default_factory=RiskConfig)
+    model_provider: ModelProviderConfig = Field(default_factory=ModelProviderConfig)
 
     @property
     def as_of_utc(self) -> datetime:

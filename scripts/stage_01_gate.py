@@ -134,7 +134,7 @@ def run_offline_gate(output_dir: Path) -> None:
 def run_binance_best_effort(output_dir: Path) -> None:
     binance_dir = output_dir / "binance"
     try:
-        data_dir = write_binance_csv_dataset(binance_dir / "data", symbol="BTC-USDT")
+        data_dir = write_binance_csv_dataset(binance_dir / "data", symbol="BTC-USDT", allow_network=True)
         csv_config = CsvDataConfig(
             bars_1h_csv=data_dir / "bars_1h.csv",
             bars_1d_csv=data_dir / "bars_1d.csv",

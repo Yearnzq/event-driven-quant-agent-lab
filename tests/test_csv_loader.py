@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from quant_agent_lab.core.config import CsvDataConfig, PipelineConfig
 from quant_agent_lab.app.pipeline import run_daily_pipeline
 from quant_agent_lab.app.cli import main
+from quant_agent_lab.data.audit import validate_run_manifest
 
 
 def _write_bars(path, *, symbol: str, timeframe: str, count: int, as_of: datetime) -> None:
@@ -100,3 +101,30 @@ def test_cli_loads_csv_dir_metadata(tmp_path) -> None:
     )
 
     assert exit_code == 0
+
+
+def test_pipeline_bad_csv_fails_closed_with_audit_artifacts(tmp_path) -> None:
+    as_of = datetime(2026, 4, 29, tzinfo=timezone.utc)
+    output_dir = tmp_path / "bad-csv-report"
+
+    result = run_daily_pipeline(
+        config=PipelineConfig(
+            symbol="BTC-USDT",
+            as_of=as_of,
+            data_source="csv",
+            csv=CsvDataConfig(
+                bars_1h_csv=tmp_path / "missing_1h.csv",
+                bars_1d_csv=tmp_path / "missing_1d.csv",
+                portfolio_json=tmp_path / "missing_portfolio.json",
+            ),
+            output_dir=output_dir,
+        )
+    )
+
+    assert result.data_validation.status.value == "fail"
+    assert result.recommendation.action.value == "insufficient_evidence"
+    assert result.risk_decision.order_allowed is False
+    assert "market data loading failed" in result.data_validation.reasons[0]
+    assert (output_dir / f"{result.run_id}.md").exists()
+    assert (output_dir / f"{result.run_id}.audit.json").exists()
+    assert validate_run_manifest(output_dir).status == "pass"

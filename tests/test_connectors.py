@@ -45,7 +45,7 @@ def test_fetch_binance_klines_maps_public_response(monkeypatch) -> None:
 
     monkeypatch.setattr("quant_agent_lab.data.connectors.urlopen", fake_urlopen)
 
-    bars = fetch_binance_klines(symbol="BTC-USDT", timeframe="1h", limit=1)
+    bars = fetch_binance_klines(symbol="BTC-USDT", timeframe="1h", limit=1, allow_network=True)
 
     assert "symbol=BTCUSDT" in captured_urls[0]
     assert "interval=1h" in captured_urls[0]
@@ -63,7 +63,12 @@ def test_write_binance_csv_dataset_writes_metadata(monkeypatch, tmp_path) -> Non
 
     monkeypatch.setattr("quant_agent_lab.data.connectors.urlopen", fake_urlopen)
 
-    output_dir = write_binance_csv_dataset(tmp_path / "binance", hourly_limit=2, daily_limit=2)
+    output_dir = write_binance_csv_dataset(
+        tmp_path / "binance",
+        hourly_limit=2,
+        daily_limit=2,
+        allow_network=True,
+    )
 
     metadata = json.loads((output_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["exchange"] == "binance"
@@ -71,3 +76,14 @@ def test_write_binance_csv_dataset_writes_metadata(monkeypatch, tmp_path) -> Non
     assert (output_dir / "bars_1h.csv").exists()
     assert (output_dir / "bars_1d.csv").exists()
     assert (output_dir / "portfolio.json").exists()
+
+
+def test_fetch_binance_requires_explicit_network_allow(monkeypatch) -> None:
+    monkeypatch.delenv("QAL_ALLOW_PUBLIC_DATA_NETWORK", raising=False)
+
+    try:
+        fetch_binance_klines(symbol="BTC-USDT", timeframe="1h", limit=1)
+    except RuntimeError as exc:
+        assert "explicit allow_network" in str(exc)
+    else:
+        raise AssertionError("fetch_binance_klines should require explicit network authorization")

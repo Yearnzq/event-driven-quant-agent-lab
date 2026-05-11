@@ -6,6 +6,8 @@ from quant_agent_lab.core.schemas import (
     RecommendationDraft,
     RiskDecision,
     SignalBundle,
+    ModelCallAuditRecord,
+    A2ATraceRecord,
 )
 
 
@@ -33,6 +35,8 @@ def render_daily_report(
     opinions: list[AgentOpinion],
     recommendation: RecommendationDraft,
     risk_decision: RiskDecision,
+    model_call_audits: list[ModelCallAuditRecord] | None = None,
+    a2a_trace_records: list[A2ATraceRecord] | None = None,
 ) -> str:
     signal_lines = "\n".join(
         f"- `{signal.name}`: {signal.direction}, strength={signal.strength}"
@@ -70,6 +74,22 @@ def render_daily_report(
         "\n".join(f"- {item}" for item in recommendation.decision_trace.fallback_reasons)
         or "- none"
     )
+    model_audit_lines = "\n".join(
+        (
+            f"- provider=`{audit.provider}`, model=`{audit.model_name}`, status=`{_value(audit.status)}`, "
+            f"latency_ms=`{audit.latency_ms}`, input_tokens=`{audit.estimated_input_tokens}`, "
+            f"output_tokens=`{audit.estimated_output_tokens}`, estimated_cost_usd=`{audit.estimated_cost_usd}`"
+        )
+        for audit in (model_call_audits or [])
+    ) or "- none"
+    a2a_trace_lines = "\n".join(
+        (
+            f"- trace_id=`{trace.trace_id}`, agent_id=`{trace.agent_id}`, "
+            f"status=`{_value(trace.status)}`, attempts=`{trace.attempt_count}`, "
+            f"timeout_seconds=`{trace.timeout_seconds}`, latency_ms=`{trace.latency_ms}`"
+        )
+        for trace in (a2a_trace_records or [])
+    ) or "- none"
     return f"""# Daily Advisory Report
 
 Run: `{run_id}`
@@ -131,6 +151,14 @@ Disagreement reasons:
 Fallback reasons:
 
 {fallback_reasons}
+
+## Model Call Audit
+
+{model_audit_lines}
+
+## A2A Trace
+
+{a2a_trace_lines}
 
 ## Risk Gate
 

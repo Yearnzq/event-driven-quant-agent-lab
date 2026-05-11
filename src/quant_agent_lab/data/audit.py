@@ -9,11 +9,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+DETERMINISTIC_CREATED_AT = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
 class AuditRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     run_id: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0))
+    created_at: datetime = DETERMINISTIC_CREATED_AT
     schema_version: str = "phase1.advisory.v1"
     input_hash: str
     output_hash: str
@@ -38,7 +41,7 @@ class ArtifactCatalog(BaseModel):
 
     schema_version: str = "phase3.artifact_catalog.v1"
     run_id: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0))
+    created_at: datetime = DETERMINISTIC_CREATED_AT
     artifacts: list[ArtifactRecord]
     order_allowed: bool = False
     human_required: bool = True
@@ -50,7 +53,7 @@ class RunManifest(BaseModel):
     schema_version: str = "phase3.run_manifest.v1"
     phase: int = 3
     run_id: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0))
+    created_at: datetime = DETERMINISTIC_CREATED_AT
     symbol: str
     as_of: datetime
     input_hash: str
@@ -60,6 +63,8 @@ class RunManifest(BaseModel):
     validation_result: str
     replay_entrypoint: str = "quant_agent_lab.app.cli"
     model_provider: str = "mock"
+    model_name: str = "mock-agents"
+    prompt_version: str = "mock.v1"
     order_allowed: bool = False
     human_required: bool = True
 
@@ -129,9 +134,14 @@ def write_artifact_catalog(
     *,
     run_id: str,
     artifacts: list[tuple[str, Path]],
+    created_at: datetime | None = None,
 ) -> Path:
     records = [artifact_record(output_dir, path, role=role) for role, path in artifacts]
-    catalog = ArtifactCatalog(run_id=run_id, artifacts=records)
+    catalog = ArtifactCatalog(
+        run_id=run_id,
+        artifacts=records,
+        created_at=created_at or DETERMINISTIC_CREATED_AT,
+    )
     return write_json(output_dir / "artifact-catalog.json", catalog.model_dump(mode="json"))
 
 
@@ -146,9 +156,14 @@ def write_run_manifest(
     config_hash: str,
     validation_result: str,
     artifact_catalog_path: Path,
+    created_at: datetime | None = None,
+    model_provider: str = "mock",
+    model_name: str = "mock-agents",
+    prompt_version: str = "mock.v1",
 ) -> Path:
     manifest = RunManifest(
         run_id=run_id,
+        created_at=created_at or as_of,
         symbol=symbol,
         as_of=as_of,
         input_hash=input_hash,
@@ -156,6 +171,9 @@ def write_run_manifest(
         config_hash=config_hash,
         artifact_catalog_hash=file_sha256(artifact_catalog_path),
         validation_result=validation_result,
+        model_provider=model_provider,
+        model_name=model_name,
+        prompt_version=prompt_version,
     )
     return write_json(output_dir / "run-manifest.json", manifest.model_dump(mode="json"))
 

@@ -58,7 +58,11 @@ dependencies installed.
 docker exec quant-agent-lab bash -lc '
 cd /workspace/event-driven-quant-agent-lab
 source /opt/miniconda3/etc/profile.d/conda.sh
-conda activate quant
+if conda env list | awk '{print $1}' | grep -qx quant; then
+  conda activate quant
+else
+  conda activate medi
+fi
 
 python --version
 python -m pytest -q
@@ -74,7 +78,11 @@ network fails:
 docker exec quant-agent-lab bash -lc '
 cd /workspace/event-driven-quant-agent-lab
 source /opt/miniconda3/etc/profile.d/conda.sh
-conda activate quant
+if conda env list | awk '{print $1}' | grep -qx quant; then
+  conda activate quant
+else
+  conda activate medi
+fi
 
 python scripts/stage_01_gate.py --try-binance
 ssh -T -o BatchMode=yes git@github.com 2>&1 || true

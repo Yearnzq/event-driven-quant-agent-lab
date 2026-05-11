@@ -65,6 +65,14 @@ See `docs/architecture.md` for the initial system design.
 - Stage 5 offline gate: `scripts/stage_05_gate.py`
 - Stage 6 review checklist: `docs/stage-06-review-checklist.zh.md`
 - Stage 6 offline gate: `scripts/stage_06_gate.py`
+- Stage 7 review checklist: `docs/stage-07-review-checklist.zh.md`
+- Stage 7 offline gate: `scripts/stage_07_gate.py`
+- Stage 8 review checklist: `docs/stage-08-review-checklist.zh.md`
+- Stage 8 offline gate: `scripts/stage_08_gate.py`
+- Stage 9 review checklist: `docs/stage-09-review-checklist.zh.md`
+- Stage 9 offline gate: `scripts/stage_09_gate.py`
+- Stage 10 review checklist: `docs/stage-10-review-checklist.zh.md`
+- Stage 10 offline gate: `scripts/stage_10_gate.py`
 - Chinese implementation roadmap: `docs/roadmap.zh.md`
 - Additional open-source project research: `docs/additional-research.zh.md`
 - Optimized implementation path: `docs/implementation-path.zh.md`
@@ -146,11 +154,112 @@ remain advisory-only:
 PYTHONPATH=src python scripts/stage_06_gate.py
 ```
 
-Download public Binance OHLCV data without API keys:
+Phase 7 prepares the model provider boundary without calling real model APIs.
+The fake provider validates provider config, prompt registry rendering,
+structured `AgentOpinion` output, and model-call audit records with cost,
+latency, input hash, prompt hash, and output hash:
+
+```bash
+PYTHONPATH=src python scripts/stage_07_gate.py
+```
+
+Run the fake provider boundary check directly:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-fake-model-call \
+  --output-dir artifacts/model-boundary
+```
+
+Phase 8 wires a single model-style recommendation agent into the daily advisory
+pipeline. Offline gates use the fake provider path and an OpenAI missing-key
+fail-closed path. A real OpenAI call is only attempted when explicitly enabled:
+
+```bash
+PYTHONPATH=src python scripts/stage_08_gate.py
+```
+
+Run a single-model advisory report with the offline fake provider:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-single-model-advisory \
+  --output-dir artifacts/single-model-reports
+```
+
+Run the OpenAI path only when a key is configured, network access is intended,
+and the provider feature flag is explicitly enabled:
+
+```bash
+QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-single-model-advisory \
+  --model-provider openai \
+  --model-name gpt-5.4-mini \
+  --allow-real-model-call \
+  --output-dir artifacts/single-model-openai
+```
+
+Phase 9 wraps the local advisory agent behind a mock A2A service boundary. The
+main pipeline calls through an A2A client, writes an Agent Card, records trace
+id / retry / timeout / hash metadata, and still keeps Data Gate and Risk Gate as
+hard advisory-only boundaries:
+
+```bash
+PYTHONPATH=src python scripts/stage_09_gate.py
+```
+
+Run a mock A2A advisory report:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-a2a-advisory \
+  --output-dir artifacts/a2a-reports
+```
+
+The output directory includes:
+
+```text
+a2a-agent-card.json
+a2a-trace.json
+```
+
+Phase 10 runs the offline walk-forward strategy style tournament and writes the
+research, simulation manifest, and Nautilus read-only adapter sample artifacts:
+
+```bash
+PYTHONPATH=src python scripts/stage_10_gate.py
+```
+
+Run the tournament directly:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-strategy-tournament \
+  --output-dir artifacts/research \
+  --audit-output-dir artifacts/audit \
+  --adapter-output-dir artifacts/adapters/nautilus
+```
+
+Phase 10 outputs:
+
+```text
+artifacts/research/strategy_style_tournament.md
+artifacts/research/strategy_style_tournament.json
+artifacts/research/walk_forward_results.json
+artifacts/research/stress_test_results.json
+artifacts/research/cost_sensitivity_results.json
+artifacts/audit/simulation_manifest.json
+artifacts/adapters/nautilus/adapter_input_sample.json
+```
+
+Download public Binance OHLCV data without API keys. This connector is
+best-effort research data only; it is not broker, account, paper-trading, or
+live-trading integration:
 
 ```bash
 PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --download-binance-data sample_data/binance_btc_usdt \
+  --allow-network-data \
   --symbol BTC-USDT
 ```
 

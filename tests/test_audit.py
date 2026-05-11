@@ -37,3 +37,31 @@ def test_run_manifest_detects_artifact_tampering(tmp_path) -> None:
 
     assert validation.status == "fail"
     assert f"artifact sha256 mismatch: {result.run_id}.md" in validation.reasons
+
+
+def test_pipeline_artifacts_are_deterministic_across_output_dirs(tmp_path) -> None:
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+
+    first = run_daily_pipeline(output_dir=first_dir)
+    second = run_daily_pipeline(output_dir=second_dir)
+
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
+    assert (first_dir / f"{first.run_id}.md").read_text(encoding="utf-8") == (
+        second_dir / f"{second.run_id}.md"
+    ).read_text(encoding="utf-8")
+    assert (first_dir / f"{first.run_id}.audit.json").read_text(encoding="utf-8") == (
+        second_dir / f"{second.run_id}.audit.json"
+    ).read_text(encoding="utf-8")
+    assert (first_dir / "run-manifest.json").read_text(encoding="utf-8") == (
+        second_dir / "run-manifest.json"
+    ).read_text(encoding="utf-8")
+
+
+def test_pipeline_artifacts_never_emit_order_allowed_true(tmp_path) -> None:
+    run_daily_pipeline(output_dir=tmp_path)
+
+    for path in tmp_path.glob("*"):
+        if path.suffix in {".json", ".jsonl", ".md"}:
+            assert '"order_allowed": true' not in path.read_text(encoding="utf-8").lower()
+            assert "order allowed: `true`" not in path.read_text(encoding="utf-8").lower()

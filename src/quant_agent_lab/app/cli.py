@@ -5,19 +5,23 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quant_agent_lab.a2a.mock import A2AClient, A2AClientAgent, MockA2AAgentServer
 from quant_agent_lab.app.pipeline import run_daily_pipeline
-from quant_agent_lab.core.config import CsvDataConfig, PipelineConfig, RiskConfig
+from quant_agent_lab.agents.model import SingleModelRecommendationAgent
+from quant_agent_lab.core.config import CsvDataConfig, ModelProviderConfig, PipelineConfig, RiskConfig
 from quant_agent_lab.data.connectors import write_binance_csv_dataset
 from quant_agent_lab.data.csv_loader import load_bars_csv
 from quant_agent_lab.data.importers import write_bad_csv_dataset, write_sample_csv_dataset
 from quant_agent_lab.data.metadata import validate_dataset_manifest
 from quant_agent_lab.data.text_cleaning import clean_news_jsonl
+from quant_agent_lab.models.fake_provider import run_fake_model_boundary_check
 from quant_agent_lab.research.evaluation import (
     build_signal_research_report,
     default_signal_registry,
     render_signal_research_markdown,
     write_signal_research_artifacts,
 )
+from quant_agent_lab.research.tournament import run_strategy_style_tournament
 
 
 def _parse_as_of(value: str) -> datetime:
@@ -40,17 +44,31 @@ def _load_csv_dir(csv_dir: Path) -> tuple[CsvDataConfig, datetime | None]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run Phase 1 daily advisory pipeline.")
+    parser = argparse.ArgumentParser(description="Run event-driven quant advisory lab utilities.")
     parser.add_argument("--write-sample-data", help="Write a deterministic CSV sample dataset and exit.")
     parser.add_argument("--write-bad-sample-data", help="Write deterministic bad CSV samples for Data Gate tests and exit.")
     parser.add_argument("--validate-dataset", help="Validate a CSV dataset metadata manifest and exit.")
     parser.add_argument("--download-binance-data", help="Download public Binance OHLCV CSV data and exit.")
+    parser.add_argument("--allow-network-data", action="store_true", help="Allow best-effort public market data download.")
     parser.add_argument("--evaluate-signals", action="store_true", help="Evaluate deterministic signals on CSV daily bars and exit.")
+    parser.add_argument("--run-fake-model-call", action="store_true", help="Run Phase 7 fake provider boundary check and exit.")
+    parser.add_argument("--run-single-model-advisory", action="store_true", help="Run Phase 8 single-model advisory pipeline.")
+    parser.add_argument("--run-a2a-advisory", action="store_true", help="Run Phase 9 mock A2A client/server advisory pipeline.")
+    parser.add_argument("--run-strategy-tournament", action="store_true", help="Run Phase 10 offline strategy style tournament.")
+    parser.add_argument("--model-provider", choices=["fake", "openai"], default="fake")
+    parser.add_argument("--model-name", default=None)
+    parser.add_argument("--allow-real-model-call", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--model-api-key-env", default="OPENAI_API_KEY", help=argparse.SUPPRESS)
+    parser.add_argument("--a2a-timeout-seconds", type=float, default=5.0)
+    parser.add_argument("--a2a-max-retries", type=int, default=1)
+    parser.add_argument("--a2a-simulate-timeout", action="store_true")
     parser.add_argument("--clean-news-jsonl", help="Clean raw news/web JSONL into schema-safe text evidence and exit.")
     parser.add_argument("--cleaned-news-output", help="Output path for --clean-news-jsonl.")
     parser.add_argument("--symbol", default="BTC-USDT")
     parser.add_argument("--as-of", help="UTC as-of timestamp for CSV runs, e.g. 2026-04-29T00:00:00Z.")
     parser.add_argument("--output-dir", default="artifacts/reports")
+    parser.add_argument("--audit-output-dir", default="artifacts/audit", help="Phase 10 tournament audit output directory.")
+    parser.add_argument("--adapter-output-dir", default="artifacts/adapters/nautilus", help="Phase 10 adapter sample output directory.")
     parser.add_argument("--data-source", choices=["mock", "csv"], default="mock")
     parser.add_argument("--csv-dir", help="Directory containing bars_1h.csv, bars_1d.csv, portfolio.json, and optional metadata.json.")
     parser.add_argument("--bars-1h-csv")
@@ -94,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result.status == "pass" else 1
 
     if args.download_binance_data:
+        if not args.allow_network_data:
+            parser.error("--download-binance-data requires --allow-network-data")
         output_dir = write_binance_csv_dataset(
             Path(args.download_binance_data),
             symbol=args.symbol,
@@ -102,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             equity=args.portfolio_equity,
             cash=args.portfolio_cash,
             position_pct=args.position_pct,
+            allow_network=True,
         )
         metadata = output_dir / "metadata.json"
         print(f"Wrote Binance public market dataset to {output_dir}")
@@ -162,6 +183,28 @@ def main(argv: list[str] | None = None) -> int:
         print(render_signal_research_markdown(report))
         return 0
 
+    if args.run_strategy_tournament:
+        report = run_strategy_style_tournament(
+            research_output_dir=Path(args.output_dir),
+            audit_output_dir=Path(args.audit_output_dir),
+            adapter_output_dir=Path(args.adapter_output_dir),
+            symbol=args.symbol,
+        )
+        print(f"Phase 10 strategy style tournament complete: {args.output_dir}")
+        print(f"Recommended next research style: {report.recommended_next_research_style}")
+        print("Deployable: false")
+        print("Order allowed: false")
+        return 0
+
+    model_name = args.model_name
+    if model_name is None:
+        model_name = "fake-structured-advisory-v1" if args.model_provider == "fake" else "gpt-5.4-mini"
+    model_provider = ModelProviderConfig(
+        provider=args.model_provider,
+        model_name=model_name,
+        allow_network=args.allow_real_model_call,
+        api_key_env=args.model_api_key_env,
+    )
     config = PipelineConfig(
         symbol=args.symbol,
         as_of=_parse_as_of(args.as_of) if args.as_of else metadata_as_of or PipelineConfig().as_of,
@@ -179,8 +222,27 @@ def main(argv: list[str] | None = None) -> int:
             max_single_hour_loss_pct=args.max_single_hour_loss_pct,
             max_portfolio_risk_budget_pct=args.max_portfolio_risk_budget_pct,
         ),
+        model_provider=model_provider,
     )
-    result = run_daily_pipeline(config=config)
+    if args.run_fake_model_call:
+        result = run_fake_model_boundary_check(config=config, output_dir=Path(args.output_dir))
+        print(result.audit_record.model_dump_json(indent=2))
+        return 0
+
+    agents = None
+    if args.run_a2a_advisory:
+        model_agent = SingleModelRecommendationAgent(config.model_provider)
+        delay = args.a2a_timeout_seconds + 0.2 if args.a2a_simulate_timeout else 0.0
+        server = MockA2AAgentServer(model_agent, response_delay_seconds=delay)
+        client = A2AClient(
+            server,
+            timeout_seconds=args.a2a_timeout_seconds,
+            max_retries=args.a2a_max_retries,
+        )
+        agents = [A2AClientAgent(client)]
+    elif args.run_single_model_advisory:
+        agents = [SingleModelRecommendationAgent(config.model_provider)]
+    result = run_daily_pipeline(config=config, agents=agents)
     print(result.report_markdown)
     return 0
 

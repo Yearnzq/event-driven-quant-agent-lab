@@ -39,6 +39,8 @@ class RiskGate:
 
     @staticmethod
     def _returns(closes: list[float]) -> list[float]:
+        if len(closes) < 2:
+            return []
         return [(right / left) - 1 for left, right in zip(closes, closes[1:]) if left > 0]
 
     @staticmethod
