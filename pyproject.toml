@@ -5,8 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quant-agent-lab"
 version = "0.1.0"
-description = "Minimal event-driven quant advisory runtime."
+description = "Event-driven quant research toolkit for structured strategy opinions and audit reports."
 requires-python = ">=3.10"
+license = "MIT"
 dependencies = [
   "pydantic>=2.10,<3",
 ]
