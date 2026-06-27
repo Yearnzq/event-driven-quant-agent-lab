@@ -32,7 +32,7 @@ class CsvDataConfig(BaseModel):
 class ModelProviderConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    provider: Literal["fake", "openai"] = "fake"
+    provider: Literal["fake", "openai", "codex"] = "fake"
     model_name: str = "fake-structured-advisory-v1"
     prompt_registry_version: str = "phase7.prompt_registry.v1"
     timeout_seconds: int = Field(default=30, ge=1, le=300)

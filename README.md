@@ -1,102 +1,85 @@
 # Event-Driven Quant Agent Lab
 
-Research workspace for comparing event-driven trading engines and designing a
-human-in-the-loop multi-agent quant advisory system.
+Minimal Python runtime for an event-driven quant advisory pipeline.
 
-## Upstream References
+This project is not an automated trading bot. It produces advisory reports only.
+All generated recommendations keep `order_allowed=false` and require human
+review before any real-world action.
 
-The source snapshots live under `upstreams/`.
+## What It Runs
 
-| Project | Local path | Primary idea to study |
-| --- | --- | --- |
-| NautilusTrader | `upstreams/nautilus_trader` | Production-grade deterministic event engine, backtest/live parity, multi-asset abstractions |
-| aat | `upstreams/aat` | Async strategy callbacks, trading/risk/execution/backtest engine split |
-| QUANTAXIS | `upstreams/QUANTAXIS` | Chinese quant workflow, pub/sub engine, A-share/futures-oriented lifecycle |
-| alphahunter | `upstreams/alphahunter` | asyncio event loop, market-making style strategy objects |
-| aioquant | `upstreams/aioquant` | Lightweight async market data, order, timer, and task modules |
+The default pipeline is:
 
-`upstreams-manifest.json` records the branch/source used for each downloaded
-snapshot. Git was not available in the current shell, so these are GitHub
-zipball snapshots rather than full git clones.
-
-## Working Thesis
-
-Use one primary event-driven engine as the runtime base, then borrow ideas from
-the other systems where they improve the design. Do not merge five frameworks
-into one runtime.
-
-The intended product is not an autonomous trading bot. It is a daily advisory
-system:
-
-1. Collect market, position, news, macro, and historical context.
-2. Convert raw inputs into normalized events and features.
-3. Ask specialized model agents for analysis.
-4. Aggregate those model outputs into a structured recommendation.
-5. Run hard risk checks.
-6. Produce a daily report for human approval.
-
-## First Architecture Direction
-
-- **Primary runtime candidate:** NautilusTrader if production-grade execution,
-  multi-asset support, and backtest/live consistency matter most.
-- **Fast prototype candidate:** aat if the team wants to stay mostly in Python
-  while validating strategy and agent workflows.
-- **Ideas to borrow:**
-  - NautilusTrader: deterministic event model and strict domain objects.
-  - aat: risk/execution/backtest separation.
-  - QUANTAXIS: localized market workflow and distributed/pub-sub thinking.
-  - alphahunter/aioquant: lightweight async I/O and strategy callback style.
-
-See `docs/architecture.md` for the initial system design.
-
-## Planning
-
-- Ten-stage implementation roadmap: `docs/ten-stage-roadmap.zh.md`
-- Requirements alignment: `docs/requirements-alignment.zh.md`
-- Stage 1 review checklist: `docs/stage-01-review-checklist.zh.md`
-- Stage 1 offline gate: `scripts/stage_01_gate.py`
-- Stage 2 review checklist: `docs/stage-02-review-checklist.zh.md`
-- Stage 2 offline gate: `scripts/stage_02_gate.py`
-- Stage 3 review checklist: `docs/stage-03-review-checklist.zh.md`
-- Stage 3 offline gate: `scripts/stage_03_gate.py`
-- Stage 4 review checklist: `docs/stage-04-review-checklist.zh.md`
-- Stage 4 offline gate: `scripts/stage_04_gate.py`
-- Stage 5 review checklist: `docs/stage-05-review-checklist.zh.md`
-- Stage 5 offline gate: `scripts/stage_05_gate.py`
-- Stage 6 review checklist: `docs/stage-06-review-checklist.zh.md`
-- Stage 6 offline gate: `scripts/stage_06_gate.py`
-- Stage 7 review checklist: `docs/stage-07-review-checklist.zh.md`
-- Stage 7 offline gate: `scripts/stage_07_gate.py`
-- Stage 8 review checklist: `docs/stage-08-review-checklist.zh.md`
-- Stage 8 offline gate: `scripts/stage_08_gate.py`
-- Stage 9 review checklist: `docs/stage-09-review-checklist.zh.md`
-- Stage 9 offline gate: `scripts/stage_09_gate.py`
-- Stage 10 review checklist: `docs/stage-10-review-checklist.zh.md`
-- Stage 10 offline gate: `scripts/stage_10_gate.py`
-- Chinese implementation roadmap: `docs/roadmap.zh.md`
-- Additional open-source project research: `docs/additional-research.zh.md`
-- Optimized implementation path: `docs/implementation-path.zh.md`
-- Advisory core engineering constraints: `docs/advisory-core-spec.zh.md`
-- Phase 1 implementation status: `docs/phase1-status.zh.md`
-
-## Phase 1 Skeleton
-
-Run tests in the `medifuse` container:
-
-```bash
-cd /workspace/event-driven-quant-agent-lab
-source /opt/miniconda3/etc/profile.d/conda.sh
-conda activate medi
-python -m pytest -q
+```text
+MarketSnapshot
+  -> Data Validation Gate
+  -> deterministic signals
+  -> advisory agent opinions
+  -> RecommendationDraft
+  -> RiskGate
+  -> Markdown report and JSON audit artifacts
 ```
 
-Run the deterministic mock advisory pipeline:
+## Install
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli --symbol BTC-USDT --output-dir artifacts/reports
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
-Run with CSV data:
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e .
+```
+
+## Run With Mock Data
+
+```bash
+quant-agent-lab --symbol BTC-USDT --output-dir artifacts/reports
+```
+
+or:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --symbol BTC-USDT \
+  --output-dir artifacts/reports
+```
+
+The output directory includes a Markdown report, JSON result, audit record,
+audit log, artifact catalog, and run manifest.
+
+## Run With CSV Data
+
+Expected files:
+
+```text
+bars_1h.csv
+bars_1d.csv
+portfolio.json
+```
+
+CSV columns:
+
+```text
+symbol,ts,open,high,low,close,volume,source,evidence_id
+```
+
+Example:
+
+```bash
+PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --data-source csv \
+  --symbol BTC-USDT \
+  --csv-dir path/to/dataset \
+  --output-dir artifacts/reports
+```
+
+You can also pass files explicitly:
 
 ```bash
 PYTHONPATH=src python -m quant_agent_lab.app.cli \
@@ -108,87 +91,26 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --output-dir artifacts/reports
 ```
 
-Expected CSV columns:
-
-```text
-symbol,ts,open,high,low,close,volume,source
-```
-
-Generate a deterministic sample CSV dataset:
+## Generate Sample Data
 
 ```bash
 PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --write-sample-data sample_data/btc_usdt
 ```
 
-The sample dataset writes a Phase 2 `metadata.json` manifest with file hashes,
-schema version, `order_allowed=false`, and `human_required=true`. Validate it:
+Validate a dataset manifest:
 
 ```bash
 PYTHONPATH=src python -m quant_agent_lab.app.cli \
   --validate-dataset sample_data/btc_usdt
 ```
 
-Generate a deterministic bad CSV dataset for Data Gate failure checks:
+## Optional Model Provider
 
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --write-bad-sample-data sample_data/bad_btc_usdt
-```
+The default provider is deterministic and offline. Real model calls are disabled
+unless explicitly enabled by environment flag and CLI option.
 
-The Phase 1.1 risk gate also checks existing position size, cash buffer, and
-hourly return volatility. These checks are advisory-only: `order_allowed`
-remains `false` in Phase 1.
-
-The Phase 5 risk gate extends deterministic checks with recent drawdown,
-downside volatility, single-hour loss, and portfolio risk budget metrics. These
-metrics are written into report JSON/Markdown and remain advisory-only:
-`order_allowed=false`, `human_required=true`.
-
-Phase 6 strengthens the advisory decision layer. Agent failures are converted
-into schema-valid failed opinions, committee disagreement is written into a
-`phase6.decision_trace.v1`, and review/no-trade/insufficient-evidence fallbacks
-remain advisory-only:
-
-```bash
-PYTHONPATH=src python scripts/stage_06_gate.py
-```
-
-Phase 7 prepares the model provider boundary without calling real model APIs.
-The fake provider validates provider config, prompt registry rendering,
-structured `AgentOpinion` output, and model-call audit records with cost,
-latency, input hash, prompt hash, and output hash:
-
-```bash
-PYTHONPATH=src python scripts/stage_07_gate.py
-```
-
-Run the fake provider boundary check directly:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --run-fake-model-call \
-  --output-dir artifacts/model-boundary
-```
-
-Phase 8 wires a single model-style recommendation agent into the daily advisory
-pipeline. Offline gates use the fake provider path and an OpenAI missing-key
-fail-closed path. A real OpenAI call is only attempted when explicitly enabled:
-
-```bash
-PYTHONPATH=src python scripts/stage_08_gate.py
-```
-
-Run a single-model advisory report with the offline fake provider:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --run-single-model-advisory \
-  --output-dir artifacts/single-model-reports
-```
-
-Run the OpenAI path only when a key is configured, network access is intended,
-and the provider feature flag is explicitly enabled:
+OpenAI Responses API example:
 
 ```bash
 QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... PYTHONPATH=src python -m quant_agent_lab.app.cli \
@@ -196,122 +118,29 @@ QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... PYTHONPATH=src python -m quant_a
   --model-provider openai \
   --model-name gpt-5.4-mini \
   --allow-real-model-call \
-  --output-dir artifacts/single-model-openai
+  --output-dir artifacts/openai-advisory
 ```
 
-Phase 9 wraps the local advisory agent behind a mock A2A service boundary. The
-main pipeline calls through an A2A client, writes an Agent Card, records trace
-id / retry / timeout / hash metadata, and still keeps Data Gate and Risk Gate as
-hard advisory-only boundaries:
+Codex-compatible endpoint example:
 
 ```bash
-PYTHONPATH=src python scripts/stage_09_gate.py
+QAL_ENABLE_CODEX_PROVIDER=1 CODEX_API_KEY=... PYTHONPATH=src python -m quant_agent_lab.app.cli \
+  --run-single-model-advisory \
+  --model-provider codex \
+  --model-name gpt-5.5 \
+  --allow-real-model-call \
+  --model-api-key-env CODEX_API_KEY \
+  --model-api-base-url https://your-endpoint.example/v1/chat/completions \
+  --model-timeout-seconds 180 \
+  --output-dir artifacts/codex-advisory
 ```
 
-Run a mock A2A advisory report:
+## Safety Boundaries
 
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --run-a2a-advisory \
-  --output-dir artifacts/a2a-reports
-```
-
-The output directory includes:
-
-```text
-a2a-agent-card.json
-a2a-trace.json
-```
-
-Phase 10 runs the offline walk-forward strategy style tournament and writes the
-research, simulation manifest, and Nautilus read-only adapter sample artifacts:
-
-```bash
-PYTHONPATH=src python scripts/stage_10_gate.py
-```
-
-Run the tournament directly:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --run-strategy-tournament \
-  --output-dir artifacts/research \
-  --audit-output-dir artifacts/audit \
-  --adapter-output-dir artifacts/adapters/nautilus
-```
-
-Phase 10 outputs:
-
-```text
-artifacts/research/strategy_style_tournament.md
-artifacts/research/strategy_style_tournament.json
-artifacts/research/walk_forward_results.json
-artifacts/research/stress_test_results.json
-artifacts/research/cost_sensitivity_results.json
-artifacts/audit/simulation_manifest.json
-artifacts/adapters/nautilus/adapter_input_sample.json
-```
-
-Download public Binance OHLCV data without API keys. This connector is
-best-effort research data only; it is not broker, account, paper-trading, or
-live-trading integration:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --download-binance-data sample_data/binance_btc_usdt \
-  --allow-network-data \
-  --symbol BTC-USDT
-```
-
-Then run the CSV pipeline using the generated `metadata.json` `as_of` value:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --data-source csv \
-  --symbol BTC-USDT \
-  --csv-dir sample_data/binance_btc_usdt \
-  --output-dir artifacts/reports
-```
-
-Evaluate the deterministic MA crossover signal offline:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --evaluate-signals \
-  --csv-dir sample_data/binance_btc_usdt \
-  --output-dir artifacts/research
-```
-
-Phase 4 evaluates the default signal registry, currently including MA crossover,
-breakout, and volatility-regime signals. The research output is advisory-only
-and writes:
-
-```text
-artifacts/research/signal-registry.json
-artifacts/research/signal_research_report.md
-artifacts/research/signal_research_report.json
-artifacts/research/artifact-catalog.json
-artifacts/research/run-manifest.json
-```
-
-Clean raw news/web JSONL before any agent sees it:
-
-```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
-  --clean-news-jsonl raw_news.jsonl \
-  --cleaned-news-output artifacts/evidence/cleaned_news.jsonl
-```
-
-Input rows should include `published_at`, `title`, and one of `content`,
-`body`, `text`, or `summary`. Output rows intentionally omit raw bodies.
-
-Every advisory pipeline run writes a Phase 3 audit ledger beside the report:
-
-```text
-artifact-catalog.json
-run-manifest.json
-```
-
-The catalog records report, result JSON, audit JSON, and audit-log file hashes.
-The run manifest records input, output, config, and catalog hashes while keeping
-`order_allowed=false` and `human_required=true`.
+- No automatic trading.
+- No broker or exchange account access.
+- No paper-trading engine.
+- No order generation.
+- `RiskGate` cannot be bypassed by model output.
+- `order_allowed` remains `false`.
+- Human review remains required.

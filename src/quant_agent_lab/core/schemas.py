@@ -222,7 +222,7 @@ class RenderedPrompt(BaseModel):
     schema_version: Literal["phase7.rendered_prompt.v1"] = "phase7.rendered_prompt.v1"
     prompt_id: str
     prompt_version: str
-    provider: Literal["fake", "openai"]
+    provider: Literal["fake", "openai", "codex"]
     model_name: str
     input_hash: str
     prompt_hash: str
@@ -235,7 +235,7 @@ class ModelCallAuditRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     schema_version: Literal["phase7.model_call_audit.v1"] = "phase7.model_call_audit.v1"
-    provider: Literal["fake", "openai"]
+    provider: Literal["fake", "openai", "codex"]
     model_name: str
     prompt_id: str
     prompt_version: str

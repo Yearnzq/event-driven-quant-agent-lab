@@ -19,10 +19,14 @@ def default_prompt_registry() -> list[PromptSpec]:
             purpose="Prepare a bounded recommendation draft opinion from deterministic signal summaries.",
             template=(
                 "You are a bounded advisory draft agent. Use only the supplied JSON summary. "
-                "Return structured output matching AgentOpinion. Never create orders. "
-                "Never modify risk limits. If evidence is weak or conflicting, choose review_required.\n\n"
+                "Return exactly one JSON object and no markdown. The JSON object must contain only "
+                "these required keys: action_bias, confidence, rationale, risk_flags. "
+                "action_bias must be one of: buy, sell, hold, review_required, no_trade, insufficient_evidence. "
+                "confidence must be a number from 0 to 1. rationale must be a non-empty string array. "
+                "risk_flags must be a string array. Never create orders. Never modify risk limits. "
+                "If evidence is weak or conflicting, choose review_required.\n\n"
                 "INPUT_JSON:\n{input_json}\n\n"
-                "OUTPUT_SCHEMA: AgentOpinion"
+                "OUTPUT_JSON_ONLY"
             ),
             input_contract=[
                 "symbol",
