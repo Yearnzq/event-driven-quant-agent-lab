@@ -45,7 +45,7 @@ quant-agent-lab --symbol BTC-USDT --output-dir artifacts/reports
 or:
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
+python -m quant_agent_lab.app.cli \
   --symbol BTC-USDT \
   --output-dir artifacts/reports
 ```
@@ -72,7 +72,7 @@ symbol,ts,open,high,low,close,volume,source,evidence_id
 Example:
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
+python -m quant_agent_lab.app.cli \
   --data-source csv \
   --symbol BTC-USDT \
   --csv-dir path/to/dataset \
@@ -82,7 +82,7 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
 You can also pass files explicitly:
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
+python -m quant_agent_lab.app.cli \
   --data-source csv \
   --symbol BTC-USDT \
   --bars-1h-csv path/to/bars_1h.csv \
@@ -94,14 +94,14 @@ PYTHONPATH=src python -m quant_agent_lab.app.cli \
 ## Generate Sample Data
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
+python -m quant_agent_lab.app.cli \
   --write-sample-data sample_data/btc_usdt
 ```
 
 Validate a dataset manifest:
 
 ```bash
-PYTHONPATH=src python -m quant_agent_lab.app.cli \
+python -m quant_agent_lab.app.cli \
   --validate-dataset sample_data/btc_usdt
 ```
 
@@ -113,7 +113,7 @@ unless explicitly enabled by environment flag and CLI option.
 OpenAI Responses API example:
 
 ```bash
-QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... PYTHONPATH=src python -m quant_agent_lab.app.cli \
+QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... python -m quant_agent_lab.app.cli \
   --run-single-model-advisory \
   --model-provider openai \
   --model-name gpt-5.4-mini \
@@ -124,7 +124,7 @@ QAL_ENABLE_OPENAI_PROVIDER=1 OPENAI_API_KEY=... PYTHONPATH=src python -m quant_a
 Codex-compatible endpoint example:
 
 ```bash
-QAL_ENABLE_CODEX_PROVIDER=1 CODEX_API_KEY=... PYTHONPATH=src python -m quant_agent_lab.app.cli \
+QAL_ENABLE_CODEX_PROVIDER=1 CODEX_API_KEY=... python -m quant_agent_lab.app.cli \
   --run-single-model-advisory \
   --model-provider codex \
   --model-name gpt-5.5 \
