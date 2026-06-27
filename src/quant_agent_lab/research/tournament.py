@@ -989,9 +989,17 @@ def run_strategy_style_tournament(
     audit_output_dir: Path,
     adapter_output_dir: Path,
     symbol: str = "BTC-USDT",
+    daily_bars: list[Bar] | None = None,
+    hourly_bars: list[Bar] | None = None,
+    data_source_label: str = "single venue deterministic sample data",
 ) -> StrategyStyleTournamentReport:
-    bars = generate_phase10_daily_bars(symbol)
-    hourly_bars = generate_phase10_hourly_adapter_sample(symbol)
+    bars = sorted(daily_bars or generate_phase10_daily_bars(symbol), key=lambda item: item.ts)
+    hourly_input = hourly_bars or generate_phase10_hourly_adapter_sample(symbol)
+    hourly_bars = sorted(hourly_input, key=lambda item: item.ts)
+    if not bars:
+        raise ValueError("strategy tournament requires daily bars")
+    if not hourly_bars:
+        raise ValueError("strategy tournament requires hourly bars for adapter sample")
     registry = default_strategy_style_registry()
     splits = default_walk_forward_splits()
     cost_models = default_cost_models()
@@ -1048,7 +1056,7 @@ def run_strategy_style_tournament(
         reason_not_deployable=[
             "research-only phase",
             "no paper trading validation",
-            "single venue deterministic sample data",
+            data_source_label,
             "limited cost model",
             "requires human review",
         ],

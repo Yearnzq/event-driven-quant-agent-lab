@@ -1,4 +1,0 @@
-interface:
-  display_name: "Quant Harness Review"
-  short_description: "Review quant harness safety and reproducibility."
-  default_prompt: "Use this skill to review quant advisory harness changes before merge."

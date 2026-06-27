@@ -1,4 +1,0 @@
-interface:
-  display_name: "Phase 1 Gate Review"
-  short_description: "Run Phase 1 offline gate checks and produce evidence."
-  default_prompt: "Use this skill to review Phase 1 readiness, run the offline gate, and summarize evidence."

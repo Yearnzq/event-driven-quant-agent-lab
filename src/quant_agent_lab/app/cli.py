@@ -55,10 +55,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-single-model-advisory", action="store_true", help="Run Phase 8 single-model advisory pipeline.")
     parser.add_argument("--run-a2a-advisory", action="store_true", help="Run Phase 9 mock A2A client/server advisory pipeline.")
     parser.add_argument("--run-strategy-tournament", action="store_true", help="Run Phase 10 offline strategy style tournament.")
-    parser.add_argument("--model-provider", choices=["fake", "openai"], default="fake")
+    parser.add_argument("--model-provider", choices=["fake", "openai", "codex"], default="fake")
     parser.add_argument("--model-name", default=None)
     parser.add_argument("--allow-real-model-call", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--model-api-key-env", default="OPENAI_API_KEY", help=argparse.SUPPRESS)
+    parser.add_argument("--model-api-base-url", default="https://api.openai.com/v1/responses", help=argparse.SUPPRESS)
+    parser.add_argument("--model-timeout-seconds", type=int, default=30, help=argparse.SUPPRESS)
     parser.add_argument("--a2a-timeout-seconds", type=float, default=5.0)
     parser.add_argument("--a2a-max-retries", type=int, default=1)
     parser.add_argument("--a2a-simulate-timeout", action="store_true")
@@ -198,12 +200,19 @@ def main(argv: list[str] | None = None) -> int:
 
     model_name = args.model_name
     if model_name is None:
-        model_name = "fake-structured-advisory-v1" if args.model_provider == "fake" else "gpt-5.4-mini"
+        if args.model_provider == "fake":
+            model_name = "fake-structured-advisory-v1"
+        elif args.model_provider == "codex":
+            model_name = "gpt-5.3-codex"
+        else:
+            model_name = "gpt-5.4-mini"
     model_provider = ModelProviderConfig(
         provider=args.model_provider,
         model_name=model_name,
         allow_network=args.allow_real_model_call,
         api_key_env=args.model_api_key_env,
+        api_base_url=args.model_api_base_url,
+        timeout_seconds=args.model_timeout_seconds,
     )
     config = PipelineConfig(
         symbol=args.symbol,

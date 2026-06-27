@@ -25,7 +25,7 @@ class SingleModelRecommendationAgent:
     def _provider(self):
         if self.provider_config.provider == "fake":
             return FakeStructuredModelProvider(self.provider_config)
-        if self.provider_config.provider == "openai":
+        if self.provider_config.provider in {"openai", "codex"}:
             return OpenAIResponsesProvider(self.provider_config)
         raise ValueError(f"unsupported model provider: {self.provider_config.provider}")
 

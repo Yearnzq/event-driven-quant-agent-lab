@@ -20,6 +20,7 @@ from quant_agent_lab.models.fake_provider import _estimate_tokens
 
 
 OPENAI_PROVIDER_ENABLE_ENV = "QAL_ENABLE_OPENAI_PROVIDER"
+CODEX_PROVIDER_ENABLE_ENV = "QAL_ENABLE_CODEX_PROVIDER"
 
 
 class AgentOpinionPayload(BaseModel):
@@ -47,16 +48,31 @@ def _output_text(response_payload: dict) -> str:
     return "\n".join(chunks)
 
 
+def _chat_completion_text(response_payload: dict) -> str:
+    choices = response_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    return content if isinstance(content, str) else ""
+
+
 class OpenAIResponsesProvider:
     name = "openai"
 
     def __init__(self, config: ModelProviderConfig) -> None:
-        if config.provider != "openai":
-            raise ValueError("OpenAIResponsesProvider requires provider='openai'")
+        if config.provider not in {"openai", "codex"}:
+            raise ValueError("OpenAIResponsesProvider requires provider='openai' or provider='codex'")
         if not config.allow_network:
-            raise ValueError("OpenAI provider requires allow_network=true")
-        if os.environ.get(OPENAI_PROVIDER_ENABLE_ENV) != "1":
-            raise RuntimeError("OpenAI provider is disabled by default")
+            raise ValueError(f"{config.provider} provider requires allow_network=true")
+        enable_env = CODEX_PROVIDER_ENABLE_ENV if config.provider == "codex" else OPENAI_PROVIDER_ENABLE_ENV
+        if os.environ.get(enable_env) != "1":
+            raise RuntimeError(f"{config.provider} provider is disabled by default")
         api_key = os.environ.get(config.api_key_env)
         if not api_key:
             raise RuntimeError(f"missing API key env: {config.api_key_env}")
@@ -98,18 +114,47 @@ class OpenAIResponsesProvider:
 
     def invoke(self, prompt: RenderedPrompt) -> tuple[AgentOpinion, ModelCallAuditRecord]:
         started = time.perf_counter()
-        payload = {
-            "model": self.config.model_name,
-            "input": prompt.rendered_prompt,
-            "text": {
-                "format": {
+        is_chat_completions = self.config.api_base_url.rstrip("/").endswith("/chat/completions")
+        if is_chat_completions:
+            payload = {
+                "model": self.config.model_name,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Return exactly one valid JSON object and no markdown. "
+                            "The only allowed keys are action_bias, confidence, rationale, risk_flags. "
+                            "action_bias must be one of buy, sell, hold, review_required, no_trade, "
+                            "insufficient_evidence. confidence must be a number from 0 to 1. "
+                            "rationale and risk_flags must be arrays of strings. "
+                            "Never create orders and never set order_allowed."
+                        ),
+                    },
+                    {"role": "user", "content": prompt.rendered_prompt},
+                ],
+                "max_completion_tokens": 512,
+                "response_format": {
                     "type": "json_schema",
-                    "name": "agent_opinion_payload",
-                    "strict": True,
-                    "schema": self._json_schema(),
-                }
-            },
-        }
+                    "json_schema": {
+                        "name": "agent_opinion_payload",
+                        "strict": True,
+                        "schema": self._json_schema(),
+                    },
+                },
+            }
+        else:
+            payload = {
+                "model": self.config.model_name,
+                "input": prompt.rendered_prompt,
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "agent_opinion_payload",
+                        "strict": True,
+                        "schema": self._json_schema(),
+                    }
+                },
+            }
         encoded = json.dumps(payload).encode("utf-8")
         req = request.Request(
             self.config.api_base_url,
@@ -123,7 +168,7 @@ class OpenAIResponsesProvider:
         try:
             with request.urlopen(req, timeout=self.config.timeout_seconds) as response:  # noqa: S310 - endpoint is explicit config.
                 response_payload = json.loads(response.read().decode("utf-8"))
-            output_text = _output_text(response_payload)
+            output_text = _chat_completion_text(response_payload) if is_chat_completions else _output_text(response_payload)
             parsed = AgentOpinionPayload.model_validate_json(output_text)
             opinion = AgentOpinion(
                 agent_name="single_model_recommendation_draft",
@@ -170,7 +215,7 @@ class OpenAIResponsesProvider:
             + (output_tokens / 1_000_000) * self.config.output_cost_per_million_tokens
         )
         audit = ModelCallAuditRecord(
-            provider="openai",
+            provider=self.config.provider,
             model_name=self.config.model_name,
             prompt_id=prompt.prompt_id,
             prompt_version=prompt.prompt_version,

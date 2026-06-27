@@ -1,23 +1,14 @@
 [project]
 name = "quant-agent-lab"
 version = "0.1.0"
-description = "Phase 1 pure Python advisory core for event-driven quant agent research."
+description = "Minimal event-driven quant advisory runtime."
 requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.10,<3",
 ]
 
-[project.optional-dependencies]
-dev = [
-  "pytest>=8,<9",
-]
-
 [project.scripts]
 quant-agent-lab = "quant_agent_lab.app.cli:main"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
