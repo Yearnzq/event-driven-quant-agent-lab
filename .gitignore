@@ -10,5 +10,8 @@ upstreams/
 
 .env
 .env.*
+openrouter_key.txt
+*_key.txt
 Dockerfile
 Dockerfile.*
+.claude/settings.local.json
